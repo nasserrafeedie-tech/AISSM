@@ -77,6 +77,24 @@ export const PlanWeekLlmOutput = z
   .strict();
 export type PlanWeekLlmOutput = z.infer<typeof PlanWeekLlmOutput>;
 
+/** MAKE_GRAPHIC → data. One entry per rendered slide. */
+export const MakeGraphicResult = z
+  .object({
+    slides: z.array(
+      z
+        .object({
+          index: z.number().int().nonnegative(),
+          media_ref: z.string().describe('stored image reference / path'),
+          width: z.number().int().positive(),
+          height: z.number().int().positive(),
+          bytes: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type MakeGraphicResult = z.infer<typeof MakeGraphicResult>;
+
 /** The bare shape the caption LLM must return for one post (JSON only, §12). */
 export const CaptionLlmOutput = z
   .object({

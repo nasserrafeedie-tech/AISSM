@@ -6,6 +6,7 @@ import { ModerationService } from './guardrails/moderation.service';
 import { PublishGateService } from './guardrails/publish-gate.service';
 import { TokenCryptoService } from './security/token-crypto.service';
 import { PostForMeService } from './publishing/post-for-me.service';
+import { GraphicsService } from './graphics/graphics.service';
 import { PlanWeekHandler } from './handlers/plan-week.handler';
 import { DraftPostHandler } from './handlers/draft-post.handler';
 import { RegeneratePostHandler } from './handlers/regenerate-post.handler';
@@ -16,6 +17,7 @@ import { FetchMetricsHandler } from './handlers/fetch-metrics.handler';
 import { IngestMediaHandler } from './handlers/ingest-media.handler';
 import { UpdateBrandProfileHandler } from './handlers/update-brand-profile.handler';
 import { PauseCustomerHandler } from './handlers/pause-customer.handler';
+import { MakeGraphicHandler } from './handlers/make-graphic.handler';
 
 @Module({
   providers: [
@@ -25,6 +27,7 @@ import { PauseCustomerHandler } from './handlers/pause-customer.handler';
     PublishGateService,
     TokenCryptoService,
     PostForMeService,
+    GraphicsService,
     // handlers
     PlanWeekHandler,
     DraftPostHandler,
@@ -36,10 +39,11 @@ import { PauseCustomerHandler } from './handlers/pause-customer.handler';
     IngestMediaHandler,
     UpdateBrandProfileHandler,
     PauseCustomerHandler,
+    MakeGraphicHandler,
     // registry, exposed to the TaskBus under the abstract token
     OperatorService,
     { provide: OPERATOR_REGISTRY, useExisting: OperatorService },
   ],
-  exports: [OPERATOR_REGISTRY, TokenCryptoService],
+  exports: [OPERATOR_REGISTRY, TokenCryptoService, GraphicsService],
 })
 export class OperatorModule {}

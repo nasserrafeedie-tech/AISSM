@@ -17,6 +17,10 @@ out/
 # prisma
 apps/backend/prisma/*.db
 
+# generated media (rendered graphics)
+apps/backend/media/
+apps/backend/scripts/out/
+
 # logs
 *.log
 npm-debug.log*

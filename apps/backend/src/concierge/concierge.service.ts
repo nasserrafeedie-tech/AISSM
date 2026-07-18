@@ -75,13 +75,28 @@ export class ConciergeService {
       return this.continueOnboarding(customer.id, customer.phone, conversation.id, msg.body, profile);
     }
 
-    // 4. Steady-state intent (approve / regenerate / question).
+    // 4. Graphic request ("make a graphic/carousel/quote card/promo...").
+    if (this.isGraphicRequest(msg.body)) {
+      const slides = buildSlidesFromText(msg.body);
+      const result = await this.bus.emit(
+        this.task(customer.id, 'MAKE_GRAPHIC', { slides }),
+      );
+      return this.reply(customer.phone, conversation.id, result.summary_for_owner);
+    }
+
+    // 5. Steady-state intent (approve / regenerate / question).
     //    Integration point: Haiku intent classification → emit the right Task.
     //    Until wired, acknowledge so the owner is never left hanging.
     await this.reply(
       customer.phone,
       conversation.id,
       "Thanks! I'll take a look and get back to you.",
+    );
+  }
+
+  private isGraphicRequest(body: string): boolean {
+    return /\b(graphic|carousel|slide|quote card|quote graphic|promo (?:post|graphic)|flyer|make (?:me )?a post)\b/i.test(
+      body,
     );
   }
 
@@ -161,6 +176,50 @@ export class ConciergeService {
       created_at: new Date().toISOString(),
     } as Task;
   }
+}
+
+/**
+ * Turn a free-text graphic request into slide specs. Deterministic heuristics
+ * for the common asks (promo with a discount, a quote card, or a simple
+ * title+body). The Haiku intent step can later replace this with richer parsing.
+ */
+export function buildSlidesFromText(
+  body: string,
+): { kind: 'title' | 'body' | 'quote' | 'promo' | 'cta'; headline: string; body?: string; footer?: string }[] {
+  const text = body.trim();
+
+  // Quote card: text inside quotation marks.
+  const quote = /["“](.+?)["”]/.exec(text);
+  if (quote && /quote/i.test(text)) {
+    return [{ kind: 'quote', headline: quote[1] }];
+  }
+
+  // Promo: a percentage or "$X off" / "sale".
+  const pct = /(\d{1,3})\s*%\s*off/i.exec(text);
+  const dollar = /\$\s?(\d+)\s*off/i.exec(text);
+  if (pct || dollar || /\bsale\b/i.test(text)) {
+    const headline = pct
+      ? `${pct[1]}% OFF`
+      : dollar
+        ? `$${dollar[1]} OFF`
+        : 'SALE';
+    return [{ kind: 'promo', headline, body: stripCommand(text) }];
+  }
+
+  // Default: a title slide from the request text.
+  const headline = stripCommand(text) || 'New Post';
+  return [{ kind: 'title', headline }];
+}
+
+/** Remove the leading "make a graphic/carousel ... that says/about" command. */
+function stripCommand(text: string): string {
+  return text
+    .replace(
+      /^\s*(please\s+)?(make|create|build|design)\s+(me\s+)?a\s+(graphic|carousel|slide|quote card|promo(?:\s+post|\s+graphic)?|flyer|post)\s*(that says|saying|about|for|:)?\s*/i,
+      '',
+    )
+    .replace(/^["“]|["”]$/g, '')
+    .trim();
 }
 
 function nextMonday(): string {

@@ -18,7 +18,12 @@ export default function Home() {
             </a>{' '}
             (Instagram, Facebook, TikTok, and more).
           </li>
-          <li>Set up billing. Everything else happens over text.</li>
+          <li>
+            <a className="underline" href="/billing">
+              Set up billing
+            </a>
+            . Everything else happens over text.
+          </li>
         </ol>
       </div>
       <p className="text-sm text-neutral-500">

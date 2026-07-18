@@ -139,6 +139,27 @@ export const UpdateBrandProfilePayload = z
   .strict();
 export type UpdateBrandProfilePayload = z.infer<typeof UpdateBrandProfilePayload>;
 
+// ── MAKE_GRAPHIC ───────────────────────────────────────────────────────────
+// Owner asked for a text graphic / carousel (quote card, "50% OFF" promo, etc).
+// The Operator renders crisp SVG→PNG slides — no AI image model needed.
+export const SlideSpecInput = z
+  .object({
+    kind: z.enum(['title', 'body', 'quote', 'promo', 'cta']),
+    headline: z.string().min(1).max(200),
+    body: z.string().max(400).optional(),
+    footer: z.string().max(80).optional(),
+  })
+  .strict();
+export type SlideSpecInput = z.infer<typeof SlideSpecInput>;
+
+export const MakeGraphicPayload = z
+  .object({
+    slides: z.array(SlideSpecInput).min(1).max(10),
+    post_id: uuid.optional().describe('attach rendered slides to this post'),
+  })
+  .strict();
+export type MakeGraphicPayload = z.infer<typeof MakeGraphicPayload>;
+
 // ── PAUSE_CUSTOMER ─────────────────────────────────────────────────────────
 // Kill switch (§8). Halt all scheduled publishing immediately.
 export const PauseCustomerPayload = z

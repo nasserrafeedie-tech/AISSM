@@ -12,6 +12,7 @@ import { FetchMetricsHandler } from './handlers/fetch-metrics.handler';
 import { IngestMediaHandler } from './handlers/ingest-media.handler';
 import { UpdateBrandProfileHandler } from './handlers/update-brand-profile.handler';
 import { PauseCustomerHandler } from './handlers/pause-customer.handler';
+import { MakeGraphicHandler } from './handlers/make-graphic.handler';
 
 /**
  * Agent B entry point (§3). Implements the OperatorRegistry the TaskBus calls.
@@ -34,6 +35,7 @@ export class OperatorService implements OperatorRegistry {
     ingestMedia: IngestMediaHandler,
     updateProfile: UpdateBrandProfileHandler,
     pause: PauseCustomerHandler,
+    makeGraphic: MakeGraphicHandler,
   ) {
     for (const h of [
       planWeek,
@@ -46,6 +48,7 @@ export class OperatorService implements OperatorRegistry {
       ingestMedia,
       updateProfile,
       pause,
+      makeGraphic,
     ] as TaskHandler[]) {
       this.handlers.set(h.type, h);
     }
