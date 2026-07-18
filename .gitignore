@@ -29,3 +29,6 @@ npm-debug.log*
 
 # test / coverage
 coverage/
+
+# next.js generated
+apps/web/next-env.d.ts
