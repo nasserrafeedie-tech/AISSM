@@ -6,6 +6,7 @@ import { TaskBus } from '../tasks/task-bus.service';
 import { TwilioService } from './twilio.service';
 import { OnboardingService } from './onboarding.service';
 import { IntentService } from './intent.service';
+import { formatInZone, tomorrowMorningInZone } from '../common/time';
 
 export interface InboundSms {
   from: string; // E.164
@@ -101,9 +102,11 @@ export class ConciergeService {
     conversationId: string,
     body: string,
   ): Promise<void> {
+    // Oldest first: this is the one we last showed them, so "yes" resolves
+    // the draft they are actually looking at.
     const pending = await this.prisma.post.findFirst({
       where: { customerId, status: 'pending_approval' },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
     });
 
     const { intent, feedback } = await this.intent.classify(body, Boolean(pending));
@@ -119,8 +122,15 @@ export class ConciergeService {
 
     switch (intent) {
       case 'approve': {
-        // Keep the planned time if it has one; otherwise go out tomorrow 9am.
-        const when = pending!.scheduledTime ?? tomorrowMorning();
+        // Keep the planned time if it has one; otherwise tomorrow 9am in the
+        // business's own timezone.
+        const cust = await this.prisma.customer.findUnique({
+          where: { id: customerId },
+          select: { timezone: true },
+        });
+        const when =
+          pending!.scheduledTime ??
+          tomorrowMorningInZone(cust?.timezone ?? 'America/Los_Angeles');
         const result = await this.bus.emit(
           this.task(customerId, 'SCHEDULE_POST', {
             post_id: pending!.id,
@@ -128,7 +138,18 @@ export class ConciergeService {
             owner_approved: true,
           }),
         );
-        return this.reply(phone, conversationId, result.summary_for_owner);
+        const more = await this.presentNextDraft(
+          customerId,
+          result.summary_for_owner,
+        );
+        if (!more) {
+          await this.reply(
+            phone,
+            conversationId,
+            `${result.summary_for_owner} That's everything for this week — I'll take it from here.`,
+          );
+        }
+        return;
       }
 
       case 'revise': {
@@ -150,7 +171,18 @@ export class ConciergeService {
             reason: 'owner declined over SMS',
           }),
         );
-        return this.reply(phone, conversationId, result.summary_for_owner);
+        const more = await this.presentNextDraft(
+          customerId,
+          result.summary_for_owner,
+        );
+        if (!more) {
+          await this.reply(
+            phone,
+            conversationId,
+            `${result.summary_for_owner} Nothing else waiting on you.`,
+          );
+        }
+        return;
       }
 
       case 'question':
@@ -171,6 +203,59 @@ export class ConciergeService {
             : "Got it — I'll keep that in mind. Text me any time you want something posted.",
         );
     }
+  }
+
+  /**
+   * Text the owner unprompted — the weekly plan landing, a draft needing a
+   * look. Everything else in here reacts to an inbound message; this is the
+   * one path that starts a conversation, so it resolves (or creates) the
+   * thread itself.
+   */
+  async notify(customerId: string, body: string): Promise<void> {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      include: { conversation: true },
+    });
+    if (!customer) {
+      this.log.warn(`notify: no customer ${customerId}`);
+      return;
+    }
+    const conversation =
+      customer.conversation ??
+      (await this.prisma.conversation.create({ data: { customerId } }));
+    await this.reply(customer.phone, conversation.id, body);
+  }
+
+  /**
+   * Show the owner the next draft waiting on them, oldest first. Drafts are a
+   * queue worked one at a time — seven separate texts on a Monday morning is
+   * how you get someone to reply STOP.
+   *
+   * Returns false when the queue is empty.
+   */
+  async presentNextDraft(customerId: string, lead?: string): Promise<boolean> {
+    const [next, customer] = await Promise.all([
+      this.prisma.post.findFirst({
+        where: { customerId, status: 'pending_approval' },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { timezone: true },
+      }),
+    ]);
+    if (!next) return false;
+
+    const tz = customer?.timezone ?? 'America/Los_Angeles';
+    const when = next.scheduledTime
+      ? ` for ${formatInZone(next.scheduledTime, tz)}`
+      : '';
+    const body =
+      (lead ? `${lead}\n\n` : '') +
+      `Draft${when}:\n\n“${preview(next.caption ?? '')}”\n\n` +
+      'Reply “yes” to schedule it, or tell me what to change.';
+    await this.notify(customerId, body);
+    return true;
   }
 
   private isGraphicRequest(body: string): boolean {
@@ -222,7 +307,19 @@ export class ConciergeService {
       return this.reply(phone, conversationId, this.onboarding.question(next, fresh));
     }
 
-    // Checklist complete → send the connect link and kick off week 1 (§6).
+    // Checklist complete → the customer is now live. Without this they stay
+    // 'onboarding' forever and the weekly cron, which only sweeps active
+    // customers, would silently never plan a week for them.
+    await this.prisma.customer.update({
+      where: { id: customerId },
+      data: { status: 'active' },
+    });
+    await this.prisma.brandProfile.updateMany({
+      where: { customerId },
+      data: { onboardingComplete: true },
+    });
+
+    // Send the connect link and kick off week 1 (§6).
     const site = process.env.PUBLIC_SITE_URL ?? 'https://aissm-web.vercel.app';
     const result = await this.bus.emit(
       this.task(customerId, 'PLAN_WEEK', { week_start: nextMonday() }, 'concierge'),
@@ -331,12 +428,10 @@ function stripCommand(text: string): string {
     .trim();
 }
 
-/** Default send time when an approved draft has no planned slot. */
-function tomorrowMorning(): Date {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(9, 0, 0, 0);
-  return d;
+/** Keep SMS short — Result.summary_for_owner caps at 480 chars total. */
+function preview(caption: string): string {
+  const flat = caption.replace(/\s+/g, ' ').trim();
+  return flat.length > 180 ? `${flat.slice(0, 177)}…` : flat;
 }
 
 function nextMonday(): string {

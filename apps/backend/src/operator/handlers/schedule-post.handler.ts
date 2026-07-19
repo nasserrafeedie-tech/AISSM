@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { type Task, type Result } from '@smm/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PublishQueueService } from '../../scheduler/publish-queue.service';
+import { formatInZone } from '../../common/time';
 import { TaskHandler, ok, fail } from './handler.interface';
 
 /**
@@ -19,9 +20,15 @@ export class SchedulePostHandler implements TaskHandler<'SCHEDULE_POST'> {
   ) {}
 
   async handle(task: Extract<Task, { type: 'SCHEDULE_POST' }>): Promise<Result> {
-    const post = await this.prisma.post.findFirst({
-      where: { id: task.payload.post_id, customerId: task.customer_id },
-    });
+    const [post, customer] = await Promise.all([
+      this.prisma.post.findFirst({
+        where: { id: task.payload.post_id, customerId: task.customer_id },
+      }),
+      this.prisma.customer.findUnique({
+        where: { id: task.customer_id },
+        select: { timezone: true },
+      }),
+    ]);
     if (!post) {
       return fail(task.task_id, "I couldn't find that post to schedule.", 'post_not_found', task.payload.post_id);
     }
@@ -49,7 +56,10 @@ export class SchedulePostHandler implements TaskHandler<'SCHEDULE_POST'> {
     });
     await this.queue.schedule({ postId: post.id, customerId: task.customer_id }, when);
 
-    return ok(task.task_id, `Scheduled for ${when.toLocaleString()}.`, 'done', {
+    // Always quote the time back in the owner's own timezone — the server's
+    // locale is irrelevant to a shop owner reading this on their phone.
+    const label = formatInZone(when, customer?.timezone ?? 'America/Los_Angeles');
+    return ok(task.task_id, `Scheduled for ${label}.`, 'done', {
       post_id: post.id,
       scheduled_time: when.toISOString(),
     });

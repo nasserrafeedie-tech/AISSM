@@ -26,15 +26,19 @@ export class DevSmsController {
     private readonly prisma: PrismaService,
   ) {}
 
-  @Post('sms')
-  async simulate(@Body() body: unknown): Promise<{ replies: string[] }> {
+  /** Both dev endpoints stay invisible in production unless explicitly opened. */
+  private assertDevAllowed(): void {
     if (
       process.env.NODE_ENV === 'production' &&
       process.env.ALLOW_DEV_SMS !== '1'
     ) {
       throw new NotFoundException();
     }
+  }
 
+  @Post('sms')
+  async simulate(@Body() body: unknown): Promise<{ replies: string[] }> {
+    this.assertDevAllowed();
     const { from, body: text } = SimBody.parse(body);
     const t0 = new Date();
 

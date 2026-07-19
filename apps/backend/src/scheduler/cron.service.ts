@@ -2,8 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { randomUUID } from 'node:crypto';
 import type { Task } from '@smm/contracts';
+import type { CalendarSlot } from '@smm/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskBus } from '../tasks/task-bus.service';
+import { ConciergeService } from '../concierge/concierge.service';
+import { zonedToUtc } from '../common/time';
+
+/** Shape of the PLAN_WEEK Result we care about. */
+type PlanResult = { data?: { slots?: CalendarSlot[] } };
 
 /**
  * The autonomous heartbeat (§10). Three recurring jobs, all routed through the
@@ -22,6 +28,7 @@ export class CronService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bus: TaskBus,
+    private readonly concierge: ConciergeService,
   ) {}
 
   private get enabled(): boolean {
@@ -36,7 +43,7 @@ export class CronService {
     return rows.map((r) => r.id);
   }
 
-  private emit(customerId: string, type: Task['type'], payload: unknown): Promise<unknown> {
+  private emit(customerId: string, type: Task['type'], payload: unknown) {
     const task = {
       task_id: randomUUID(),
       customer_id: customerId,
@@ -54,12 +61,65 @@ export class CronService {
   async planWeek(): Promise<void> {
     if (!this.enabled) return;
     const ids = await this.activeCustomerIds();
-    this.log.log(`weekly PLAN_WEEK for ${ids.length} customers`);
+    this.log.log(`weekly rhythm for ${ids.length} customers`);
     for (const id of ids) {
-      await this.emit(id, 'PLAN_WEEK', { week_start: nextMonday() }).catch((e) =>
-        this.log.warn(`PLAN_WEEK failed for ${id}: ${e.message}`),
+      await this.runWeeklyRhythm(id).catch((e) =>
+        this.log.warn(`weekly rhythm failed for ${id}: ${e.message}`),
       );
     }
+  }
+
+  /**
+   * The whole Monday morning in one place: plan the week, draft a post for
+   * every planned slot, then hand the first draft to the owner over SMS.
+   *
+   * Planning alone used to be the end of it — a calendar nobody ever saw and
+   * no posts to go with it. The owner only experiences this product when the
+   * text arrives, so the notify step is the part that matters.
+   */
+  async runWeeklyRhythm(customerId: string): Promise<number> {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { timezone: true },
+    });
+    const tz = customer?.timezone ?? 'America/Los_Angeles';
+
+    const planned = await this.emit(customerId, 'PLAN_WEEK', {
+      week_start: nextMonday(),
+    });
+    const slots = (planned as PlanResult)?.data?.slots ?? [];
+    if (!slots.length) {
+      this.log.warn(`no slots planned for ${customerId}`);
+      return 0;
+    }
+
+    let drafted = 0;
+    for (const slot of slots) {
+      try {
+        await this.emit(customerId, 'DRAFT_POST', {
+          platform: slot.platform,
+          archetype: slot.archetype,
+          scheduled_time: zonedToUtc(slot.date, slot.best_time, tz).toISOString(),
+          needs_asset: slot.needs_asset,
+          shot_list_hint: slot.shot_list,
+        });
+        drafted++;
+      } catch (e) {
+        // One bad draft shouldn't cost the owner their whole week.
+        this.log.warn(
+          `DRAFT_POST failed for ${customerId} on ${slot.date}: ${(e as Error).message}`,
+        );
+      }
+    }
+
+    if (drafted > 0) {
+      await this.concierge.presentNextDraft(
+        customerId,
+        `Morning! Your week is planned — ${drafted} post${drafted > 1 ? 's' : ''} ready for a look.`,
+      );
+    }
+    this.log.log(`${customerId}: planned ${slots.length}, drafted ${drafted}`);
+    return drafted;
   }
 
   /** Hourly: publish anything now due (belt-and-suspenders with BullMQ). */

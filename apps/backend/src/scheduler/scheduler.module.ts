@@ -4,10 +4,15 @@ import { RedisProvider, REDIS_CONNECTION } from './redis.provider';
 import { PublishQueueService } from './publish-queue.service';
 import { PublishWorker } from './publish.worker';
 import { CronService } from './cron.service';
+import { DevCronController } from './dev-cron.controller';
+import { ConciergeModule } from '../concierge/concierge.module';
 
 @Global()
 @Module({
-  imports: [ScheduleModule.forRoot()],
+  // ConciergeModule for the weekly "your posts are ready" text. No cycle:
+  // the Concierge never imports the scheduler.
+  imports: [ScheduleModule.forRoot(), ConciergeModule],
+  controllers: [DevCronController],
   providers: [RedisProvider, PublishQueueService, PublishWorker, CronService],
   exports: [PublishQueueService, REDIS_CONNECTION],
 })

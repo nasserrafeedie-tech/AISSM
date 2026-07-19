@@ -110,6 +110,11 @@ model Customer {
   id              String         @id @default(uuid()) @db.Uuid
   phone           String         @unique
   businessName    String?
+  // IANA zone the business actually operates in. Every scheduled time is a
+  // wall-clock hour in here — without it, a 9am post lands at 2am. Defaulted
+  // rather than asked during onboarding to keep the interview to five
+  // questions; the owner can correct it in conversation.
+  timezone        String         @default("America/Los_Angeles")
   planTier        String         @default("starter")
   trustLevel      TrustLevel     @default(approve_all) // §8: everyone starts here
   status          CustomerStatus @default(onboarding)
