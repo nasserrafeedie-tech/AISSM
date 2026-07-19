@@ -62,9 +62,6 @@ function Header() {
           <a className="hover:text-ink" href="/about">
             About
           </a>
-          <a className="hover:text-ink" href="/connect">
-            Connect
-          </a>
         </nav>
         <a
           href="/billing"
