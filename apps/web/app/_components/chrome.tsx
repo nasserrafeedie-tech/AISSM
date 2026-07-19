@@ -43,7 +43,7 @@ export function SiteHeader() {
           href="/"
           className="group flex items-baseline gap-1 font-display text-xl font-semibold tracking-tight"
         >
-          AISSM
+          Handled
           <span
             aria-hidden
             className="inline-block text-clay-500 transition-transform duration-700 ease-out group-hover:rotate-180 motion-safe:animate-spin-slow"
@@ -95,7 +95,7 @@ export function SiteFooter() {
               aria-hidden
               className="select-none font-display text-[17vw] font-semibold leading-none tracking-tight text-ink/[0.08] sm:text-[8rem]"
             >
-              AISSM<span className="text-clay-500/30">✳</span>
+              Handled<span className="text-clay-500/30">✳</span>
             </p>
             <p className="mt-2 font-display text-lg italic text-ink/70">
               Your social media, handled.
@@ -125,7 +125,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-ink/10 pt-6 font-mono text-[11px] text-ink/55 sm:flex-row sm:items-center">
-          <span>© {new Date().getFullYear()} AISSM</span>
+          <span>© {new Date().getFullYear()} Handled</span>
           <span>
             No dashboard. No passwords. Reply STOP any time.
           </span>

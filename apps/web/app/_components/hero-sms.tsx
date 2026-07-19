@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 /**
  * The hero's proof: a phone that runs the actual product on loop. An owner's
- * request types itself out, AISSM "thinks", and a real graphic (rendered by
+ * request types itself out, Handled "thinks", and a real graphic (rendered by
  * the production engine) arrives. Then the next request begins.
  *
  * Honest by construction — the images are the same files the engine produced
@@ -106,7 +106,7 @@ export function HeroPhone() {
         <div className="flex items-center justify-between bg-ink px-6 py-2.5 font-mono text-[10px] tracking-wider text-paper/70">
           <span>9:14</span>
           <span className="font-sans text-[11px] font-medium tracking-normal text-paper">
-            AISSM ✳
+            Handled ✳
           </span>
           <span>•••</span>
         </div>
@@ -121,7 +121,7 @@ export function HeroPhone() {
             )}
           </div>
 
-          {/* AISSM thinking */}
+          {/* Handled thinking */}
           {stage === 'thinking' && (
             <div className="self-start rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-soft">
               <span className="flex gap-1">

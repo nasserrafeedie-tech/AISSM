@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Terms & Conditions — AISSM',
-  description: 'The terms governing use of the AISSM social media service.',
+  title: 'Terms & Conditions — Handled',
+  description: 'The terms governing use of the Handled social media service.',
 };
 
 const UPDATED = 'July 18, 2026';
@@ -24,7 +24,7 @@ export default function TermsPage() {
       </div>
 
       <p className="text-ink/75">
-        These Terms &amp; Conditions govern your use of AISSM (&ldquo;the
+        These Terms &amp; Conditions govern your use of Handled (&ldquo;the
         Service&rdquo;), a social media management service for small businesses
         operated over text message. By signing up, you agree to these terms.
       </p>
@@ -32,7 +32,7 @@ export default function TermsPage() {
       <section className="flex flex-col gap-2">
         <h2 className="font-display text-xl font-medium">The service</h2>
         <p className="text-ink/75">
-          AISSM creates, schedules, and (with your approval) publishes social
+          Handled creates, schedules, and (with your approval) publishes social
           media content on your behalf. You remain responsible for the accuracy
           and legality of information you provide and any content you approve for
           posting.
@@ -43,7 +43,7 @@ export default function TermsPage() {
         <h2 className="font-display text-xl font-medium">SMS messaging terms</h2>
         <p className="text-ink/75">
           By providing your mobile number, you consent to receive
-          account-related text messages from AISSM, including content for review,
+          account-related text messages from Handled, including content for review,
           approval requests, publishing confirmations, and weekly summaries.
           Message frequency varies with your activity (typically a few messages
           per week). <strong>Message and data rates may apply.</strong> Reply{' '}

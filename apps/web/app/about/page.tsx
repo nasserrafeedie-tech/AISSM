@@ -3,9 +3,9 @@ import { FOUNDER_NAME, FOUNDER_ROLE, FOUNDER_NOTE } from '../_lib/founder';
 import { Reveal, RisingWords } from '../_components/motion';
 
 export const metadata: Metadata = {
-  title: 'About — AISSM',
+  title: 'About — Handled',
   description:
-    'Why AISSM exists: giving small businesses the calm, done-for-you social media presence that used to be reserved for companies with a marketing budget.',
+    'Why Handled exists: giving small businesses the calm, done-for-you social media presence that used to be reserved for companies with a marketing budget.',
 };
 
 const BELIEFS = [
@@ -49,7 +49,7 @@ export default function AboutPage() {
             className="mt-8 max-w-2xl animate-fade-in text-lg leading-relaxed text-ink/70"
             style={{ animationDelay: '800ms' }}
           >
-            AISSM plans, writes, designs, and publishes social media for local
+            Handled plans, writes, designs, and publishes social media for local
             businesses — almost entirely on its own, and entirely over text. We
             built it for the owners who are brilliant at what they do and simply
             don’t have another ten hours a week to spend fighting with
@@ -67,7 +67,7 @@ export default function AboutPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/founder.jpg"
-                  alt={`${FOUNDER_NAME}, ${FOUNDER_ROLE} of AISSM`}
+                  alt={`${FOUNDER_NAME}, ${FOUNDER_ROLE} of Handled`}
                   className="aspect-[3/4] w-full rounded-xl object-cover"
                 />
                 <p className="mt-4 text-center font-mono text-[11px] uppercase tracking-[0.18em] text-ink/50">

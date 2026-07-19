@@ -13,7 +13,7 @@ import { Reveal, RisingWords } from '../_components/motion';
 type Sample = {
   file: string;
   ask: string; // what the owner texts
-  reply: string; // what AISSM texts back
+  reply: string; // what Handled texts back
   brand: string;
 };
 
@@ -129,7 +129,7 @@ export default function DemoPage() {
                 <div className="flex items-center justify-between bg-ink px-6 py-2.5 font-mono text-[10px] tracking-wider text-paper/70">
                   <span>9:41</span>
                   <span className="font-sans text-[11px] font-medium tracking-normal text-paper">
-                    AISSM ✳
+                    Handled ✳
                   </span>
                   <span>•••</span>
                 </div>

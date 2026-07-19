@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 
 // Branded preview card shown when the site is shared on social / in messages.
 export const runtime = 'edge';
-export const alt = 'AISSM — your social media, handled';
+export const alt = 'Handled — your social media, handled';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -36,10 +36,10 @@ export default function OpengraphImage() {
               fontWeight: 700,
             }}
           >
-            A
+            H
           </div>
           <div style={{ fontSize: '30px', fontWeight: 700, color: '#1A140D' }}>
-            AISSM
+            Handled
           </div>
         </div>
 

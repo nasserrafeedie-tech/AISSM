@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — AISSM',
-  description: 'How AISSM handles your information, including SMS/text messaging.',
+  title: 'Privacy Policy — Handled',
+  description: 'How Handled handles your information, including SMS/text messaging.',
 };
 
 const UPDATED = 'July 18, 2026';
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
       </div>
 
       <p className="text-ink/75">
-        AISSM (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) provides
+        Handled (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) provides
         a social media management service for small businesses, operated over
         text message (SMS). This policy explains what information we collect and
         how we use it.
