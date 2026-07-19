@@ -1,0 +1,92 @@
+import type { Platform } from '@smm/contracts';
+
+/**
+ * Distribution playbook — how each platform's ranking system actually behaves,
+ * expressed as writing rules the caption model must follow.
+ *
+ * Researched July 2026. The rules encode a few things that changed recently and
+ * that most "social media tips" content still gets wrong:
+ *
+ *  • Reach is earned by SENDS, not likes. Instagram weights a DM share roughly
+ *    3-5x a like, because a send is a person vouching for you to one specific
+ *    friend. Every caption should give someone a reason to forward it.
+ *  • SAVES are the second currency, and they're what local businesses can
+ *    actually win — "hours", "how to keep this alive", "what to order" are all
+ *    save-bait in a way that a pretty photo is not.
+ *  • Instagram is now a search engine. Plain keywords in the first sentence
+ *    ("Pasadena coffee shop") do more for discovery than a wall of hashtags,
+ *    and 3-5 specific tags now beat 30 broad ones.
+ *  • Only the first ~125 characters show before "... more". If the hook and the
+ *    reason to care aren't in there, nothing else in the caption matters.
+ *
+ * Keeping this in one file means the strategy is reviewable and updatable in
+ * one place when the platforms change again — which they will.
+ */
+
+/** Shared rules that hold across every surface we publish to. */
+const UNIVERSAL: string[] = [
+  'Open with a hook in the first 125 characters — that is all anyone sees before the caption truncates. Never open with "We are excited to announce".',
+  'Write for one specific person, not an audience. Second person ("you"), present tense.',
+  'Weave 1-2 plain search keywords naturally into the first two sentences (what the business is, what it sells, the neighbourhood it is in). These platforms are search engines now; keywords in the caption do more for discovery than hashtags.',
+  'Earn a SEND or a SAVE, not a like. Close with a reason to forward it to a specific person ("send this to whoever…") or to keep it ("save this for…"). Sends are weighted several times more than likes for reaching new people.',
+  'Be concrete. Real prices, real hours, real names, real details from the brand profile. Never invent facts, offers, or claims.',
+  'No engagement-bait ("comment YES below", "tag 3 friends"), no hollow hype, no emoji soup. One or two emoji at most, and only where a person would actually use one.',
+];
+
+const PER_PLATFORM: Record<Platform, string[]> = {
+  instagram: [
+    'Caption 80-150 words. Put the hook and the point in the first two lines.',
+    'Exactly 3-5 hashtags, all specific and niche (neighbourhood, category, city). Broad tags like #love or #instagood actively waste the slot — Instagram now caps meaningful tags around 5.',
+  ],
+  facebook: [
+    'Shorter than Instagram — 40-80 words. Facebook rewards posts that start conversations between people who already know the business.',
+    '0-2 hashtags; they do almost nothing here. Plain language wins.',
+  ],
+  tiktok: [
+    'Very short caption, under 150 characters, written like a person talking.',
+    '3-5 hashtags mixing one broad discovery tag with specific niche ones. TikTok search is a real traffic source — write the caption the way someone would type the search.',
+  ],
+  x: [
+    'Under 240 characters. One idea, said plainly. No thread, no filler.',
+    '0-2 hashtags maximum.',
+  ],
+  linkedin: [
+    '60-120 words. Lead with the useful observation or the result, not the announcement.',
+    '0-3 professional hashtags. Skip the inspirational framing.',
+  ],
+  threads: [
+    'Conversational and short, under 300 characters. Written to be replied to.',
+    '0-2 hashtags.',
+  ],
+  youtube: [
+    'First sentence doubles as the search result description — front-load the keywords.',
+    '3-5 hashtags; the first three surface above the title.',
+  ],
+};
+
+/**
+ * Format-level guidance. Which format to reach for is a strategy decision the
+ * planner makes; this explains the trade so it chooses deliberately.
+ */
+export const FORMAT_NOTES = [
+  'Reels/video reach 3-5x further than anything else and are how new people find a local business — watch time past the first 3 seconds is the single biggest ranking signal, so the first frame has to earn the second one.',
+  'Carousels earn far more saves than single images (roughly 9x) and are the best format for anything a customer might want to come back to: hours, menus, how-to, before/after.',
+  'Single photos are for moments that are genuinely good photos. A great real photo with a well-written caption beats a mediocre photo with a graphic slapped on it — do not decorate for the sake of decorating.',
+].join('\n');
+
+/** The caption-writing rules for one platform, ready to append to a prompt. */
+export function playbookFor(platform: Platform): string {
+  return [
+    'DISTRIBUTION RULES (follow these exactly — they reflect how this platform ranks content in 2026):',
+    ...UNIVERSAL.map((r) => `- ${r}`),
+    ...(PER_PLATFORM[platform] ?? []).map((r) => `- ${r}`),
+  ].join('\n');
+}
+
+/**
+ * Alt text is a genuine ranking and accessibility input, and almost nobody
+ * writes it. Under ~125 characters, describe what is actually in the frame,
+ * with the business's keywords used naturally rather than stuffed.
+ */
+export const ALT_TEXT_RULE =
+  'Also return "alt_text": a literal description of the image under 125 characters for screen readers, including the business type and location naturally. Describe what is visibly in the frame — never repeat the caption.';

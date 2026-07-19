@@ -185,6 +185,9 @@ model Post {
   archetype       PostArchetype
   platform        Platform
   caption         String?
+  // Screen-reader description AND a real ranking input on IG/FB — the
+  // platforms read it to understand the image. Written at draft time.
+  altText         String?
   hashtags        String[]
   mediaRefs       String[]
   scheduledTime   DateTime?

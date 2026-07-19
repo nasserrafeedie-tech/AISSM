@@ -100,6 +100,13 @@ export const CaptionLlmOutput = z
   .object({
     caption: z.string().min(1),
     hashtags: z.array(z.string()),
+    /**
+     * Screen-reader description of the image (<125 chars). Doubles as a real
+     * ranking input — the platforms read it to understand what's in the frame —
+     * and almost no small business ever writes one. Optional so an older or
+     * terser model response still validates.
+     */
+    alt_text: z.string().max(300).optional(),
   })
   .strict();
 export type CaptionLlmOutput = z.infer<typeof CaptionLlmOutput>;

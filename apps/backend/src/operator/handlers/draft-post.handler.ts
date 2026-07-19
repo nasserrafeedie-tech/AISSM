@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { LlmService } from '../llm/llm.service';
 import { buildBrandContext } from '../llm/brand-context';
+import { playbookFor, ALT_TEXT_RULE } from '../llm/playbook';
 import { ModerationService } from '../guardrails/moderation.service';
 import { PublishGateService } from '../guardrails/publish-gate.service';
 import { TaskHandler, ok, fail } from './handler.interface';
@@ -47,11 +48,16 @@ export class DraftPostHandler implements TaskHandler<'DRAFT_POST'> {
     const prompt = [
       `Write one ${archetype} post for ${platform}.`,
       task.payload.prompt_notes ? `Notes: ${task.payload.prompt_notes}.` : '',
-      'Return JSON: {"caption": string, "hashtags": string[]}.',
+      '',
+      // How this platform actually ranks content — see llm/playbook.ts.
+      playbookFor(platform),
+      '',
+      'Return JSON: {"caption": string, "hashtags": string[], "alt_text": string}.',
       'Caption in the brand voice. Hashtags without the # prefix.',
+      ALT_TEXT_RULE,
     ]
       .filter(Boolean)
-      .join(' ');
+      .join('\n');
 
     const gen = await this.llm.completeJson(
       { tier: 'bulk', cachedContext: context, prompt, maxTokens: 600 },
@@ -74,6 +80,7 @@ export class DraftPostHandler implements TaskHandler<'DRAFT_POST'> {
         archetype,
         platform,
         caption: gen.caption,
+        altText: gen.alt_text ?? null,
         hashtags: gen.hashtags,
         mediaRefs: [],
         scheduledTime: task.payload.scheduled_time

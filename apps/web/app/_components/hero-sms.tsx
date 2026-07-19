@@ -21,22 +21,22 @@ const EXCHANGES: Exchange[] = [
   {
     ask: 'post about our fresh croissants this morning',
     reply: 'On it — here’s a draft for 8am ☕',
-    img: '/samples/promo.jpg',
+    img: '/samples/composed-promo.jpg',
   },
   {
     ask: 'something for the spring bouquet launch',
     reply: 'Spring it is 🌷 how’s this?',
-    img: '/samples/title.jpg',
+    img: '/samples/composed-bouquet.jpg',
   },
   {
     ask: 'a quote card — best ideas are brewed, not forced',
     reply: 'Love that line. Draft below.',
-    img: '/samples/quote.jpg',
+    img: '/samples/graphic-quote.jpg',
   },
   {
-    ask: 'a come-visit-us post with our hours',
-    reply: 'Done — warm and simple.',
-    img: '/samples/cta.jpg',
+    ask: 'took this before we opened, do something with it',
+    reply: 'It doesn’t need a graphic — just words.',
+    img: '/samples/photo-cortados.jpg',
   },
 ];
 

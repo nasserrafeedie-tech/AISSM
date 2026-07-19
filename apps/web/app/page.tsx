@@ -1,6 +1,7 @@
 import { Reveal, RisingWords } from './_components/motion';
 import { HeroPhone } from './_components/hero-sms';
 import { Faq } from './_components/faq';
+import { SAMPLES } from './_lib/samples';
 
 // Real photography served straight from Unsplash's CDN (free license) so we
 // don't ship large binaries in the repo.
@@ -35,29 +36,6 @@ const STEPS = [
     n: '03',
     title: 'You reply “yes”',
     body: 'Approve with a word and we publish on schedule. Too busy? Let us post on autopilot once you trust us.',
-  },
-];
-
-const SAMPLES = [
-  {
-    file: 'promo.jpg',
-    prompt: 'make a promo for 50% off all lattes this Friday',
-    tilt: '-rotate-1',
-  },
-  {
-    file: 'quote.jpg',
-    prompt: 'a quote card: the best ideas are brewed, not forced',
-    tilt: 'rotate-1',
-  },
-  {
-    file: 'title.jpg',
-    prompt: 'a graphic for our spring bouquet launch',
-    tilt: '-rotate-1',
-  },
-  {
-    file: 'cta.jpg',
-    prompt: 'a come-visit-us post with our hours',
-    tilt: 'rotate-1',
   },
 ];
 
@@ -211,37 +189,51 @@ export default function Home() {
               </h2>
             </div>
             <p className="max-w-sm text-[15px] leading-relaxed text-ink/60">
-              Your photos, real typography, your colors — not blurry AI art with
-              garbled text. Every sample here came out of the same engine that
-              would make yours.
+              Sometimes we design a graphic. Sometimes your own photo is already
+              the post and the writing is the work. Every one of these — image
+              and caption — came out of the same engine that would make yours.
             </p>
           </Reveal>
 
-          <div className="mt-16 grid gap-x-6 gap-y-14 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {SAMPLES.map((s, i) => (
-              <Reveal key={s.file} delay={i * 110}>
-                <figure className="group">
-                  {/* The request, styled as the text it actually was */}
-                  <figcaption className="mb-4 flex justify-end">
-                    <span className="max-w-[240px] rounded-2xl rounded-br-md bg-clay-500 px-4 py-2.5 text-[13px] leading-snug text-white shadow-soft">
-                      {s.prompt}
-                    </span>
-                  </figcaption>
-                  <div
-                    className={`overflow-hidden rounded-3xl border border-ink/10 bg-white shadow-soft transition-all duration-500 ease-out ${s.tilt} group-hover:rotate-0 group-hover:shadow-lift`}
-                  >
+              <Reveal key={s.file} delay={i * 90}>
+                <figure className="group flex h-full flex-col overflow-hidden rounded-3xl border border-ink/10 bg-white shadow-soft transition-shadow duration-500 hover:shadow-lift">
+                  <div className="relative overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`/samples/${s.file}`}
-                      alt={`Finished post for: ${s.prompt}`}
+                      alt={s.alt}
                       loading="lazy"
                       className="aspect-square w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                     />
+                    <span className="absolute left-3 top-3 rounded-full bg-paper/90 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink/70 backdrop-blur-sm">
+                      {s.label}
+                    </span>
                   </div>
+
+                  {/* The caption that ships with it — the half nobody shows */}
+                  <figcaption className="flex flex-1 flex-col gap-3 px-5 pb-5 pt-4">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-clay-600">
+                      {s.brand}
+                    </span>
+                    <p className="whitespace-pre-line text-[13px] leading-relaxed text-ink/75">
+                      {s.caption}
+                    </p>
+                  </figcaption>
                 </figure>
               </Reveal>
             ))}
           </div>
+
+          <Reveal delay={120}>
+            <p className="mx-auto mt-14 max-w-2xl text-center text-[15px] leading-relaxed text-ink/60">
+              Every caption is written the way the platforms actually rank in
+              2026 — the hook inside the first 125 characters, plain search
+              keywords early, and a reason to forward or save it. A DM share is
+              worth several times a like for reaching new people.
+            </p>
+          </Reveal>
         </div>
       </section>
 
