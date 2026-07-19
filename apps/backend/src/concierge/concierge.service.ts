@@ -95,7 +95,7 @@ export class ConciergeService {
   }
 
   private isGraphicRequest(body: string): boolean {
-    return /\b(graphic|carousel|slide|quote card|quote graphic|promo (?:post|graphic)|flyer|make (?:me )?a post)\b/i.test(
+    return /\b(graphic|carousel|slide|quote card|quote graphic|promo|flyer|make (?:me )?a post)\b/i.test(
       body,
     );
   }
@@ -107,24 +107,54 @@ export class ConciergeService {
     answer: string,
     profile: Awaited<ReturnType<PrismaService['brandProfile']['findUnique']>>,
   ): Promise<void> {
-    // Integration point: interpret `answer` with Haiku (it may fill several
-    // fields at once, §6) and emit UPDATE_BRAND_PROFILE with the patch +
-    // synthesize_voice on the final field. Here we advance the checklist.
-    const nextField = this.onboarding.nextField(profile);
-
-    if (nextField) {
-      const q = this.onboarding.question(nextField, profile);
-      return this.reply(phone, conversationId, q);
+    // First contact: we haven't asked anything yet, so this message ("hi",
+    // "I just signed up") isn't an answer. Welcome them and ask question one.
+    const outboundCount = await this.prisma.message.count({
+      where: { conversationId, direction: 'outbound' },
+    });
+    if (outboundCount === 0) {
+      const first = this.onboarding.nextField(profile)!;
+      return this.reply(phone, conversationId, this.onboarding.question(first, profile));
     }
 
-    // Just became complete → kick off week 1 (§6 closing step).
+    // Interpret the answer to whichever field we asked about last (§6 — one
+    // chatty answer may fill several fields; Haiku handles that when keyed,
+    // deterministic parsing covers the asked field offline).
+    const asked = this.onboarding.nextField(profile);
+    if (asked) {
+      const patch = await this.onboarding.interpret(asked, answer, profile);
+      if (Object.keys(patch).length > 0) {
+        await this.bus.emit(
+          this.task(customerId, 'UPDATE_BRAND_PROFILE', {
+            patch,
+            // Final answer → synthesize a durable voice from everything (§6).
+            synthesize_voice: this.onboarding.wouldComplete(profile, patch),
+          }),
+        );
+      }
+    }
+
+    // Ask the next empty field, or close out the interview.
+    const fresh = await this.prisma.brandProfile.findUnique({
+      where: { customerId },
+    });
+    const next = this.onboarding.nextField(fresh);
+    if (next) {
+      return this.reply(phone, conversationId, this.onboarding.question(next, fresh));
+    }
+
+    // Checklist complete → send the connect link and kick off week 1 (§6).
+    const site = process.env.PUBLIC_SITE_URL ?? 'https://aissm-web.vercel.app';
     const result = await this.bus.emit(
       this.task(customerId, 'PLAN_WEEK', { week_start: nextMonday() }, 'concierge'),
     );
     await this.reply(
       phone,
       conversationId,
-      `Perfect — that's everything I need. ${result.summary_for_owner}`,
+      `That's everything I need ✳ One last thing, whenever you have two ` +
+        `minutes: connect the accounts you want me to post to (secure link, ` +
+        `we never see your passwords): ${site}/connect?c=${customerId}` +
+        `\n\nMeanwhile — ${result.summary_for_owner}`,
     );
   }
 

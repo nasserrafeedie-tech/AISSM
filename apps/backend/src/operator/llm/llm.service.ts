@@ -129,8 +129,13 @@ export class LlmService {
     // PLAN_WEEK — asks for a "slots" array.
     if (/slots/i.test(req.prompt)) {
       const count = Number(/plan\s+(\d+)\s+posts/i.exec(req.prompt)?.[1] ?? 5);
-      const startMatch = /week starting (\S+)/i.exec(req.prompt)?.[1];
-      const start = startMatch ? new Date(startMatch) : new Date();
+      // Strip trailing punctuation so "…starting 2026-07-20." can't produce
+      // an Invalid Date (which would crash toISOString below).
+      const startMatch = /week starting (\S+)/i
+        .exec(req.prompt)?.[1]
+        ?.replace(/[.,;]+$/, '');
+      let start = startMatch ? new Date(startMatch) : new Date();
+      if (Number.isNaN(start.getTime())) start = new Date();
       const archetypes = [
         'were_open',
         'behind_the_scenes',

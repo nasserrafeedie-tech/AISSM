@@ -161,7 +161,9 @@ model BrandProfile {
   offers             String[]
   dosAndDonts        String[]
   blackoutTopics     String[]
-  postingFrequency   Int      @default(3)
+  // Null until the owner answers during onboarding — a DB default would make
+  // the interview think the question was already answered and skip it.
+  postingFrequency   Int?
   brandColors        String[]
   logoRef            String?
   referencePhotoRefs String[]

@@ -39,7 +39,8 @@ export class PlanWeekHandler implements TaskHandler<'PLAN_WEEK'> {
       );
     }
 
-    const frequency = task.payload.posting_frequency ?? profile.postingFrequency;
+    const frequency =
+      task.payload.posting_frequency ?? profile.postingFrequency ?? 3;
     const recentMetrics = await this.prisma.metric.findMany({
       where: { customerId: task.customer_id },
       orderBy: { fetchedAt: 'desc' },
@@ -48,7 +49,7 @@ export class PlanWeekHandler implements TaskHandler<'PLAN_WEEK'> {
 
     const context = buildBrandContext(profile);
     const prompt = [
-      `Plan ${frequency} posts for the week starting ${task.payload.week_start}.`,
+      `Plan ${frequency} posts for the week starting ${task.payload.week_start.slice(0, 10)}.`,
       'Mix archetypes across the week (promo, behind_the_scenes, testimonial,',
       'educational_tip, product_spotlight, seasonal, ugc_repost, were_open).',
       'Prefer slots that use the owner\'s real photos.',
