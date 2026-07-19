@@ -1,3 +1,5 @@
+import { FOUNDER_NAME, FOUNDER_ROLE, FOUNDER_NOTE } from './_lib/founder';
+
 // Warm, human-first landing page. Real photography is served straight from
 // Unsplash's CDN (free to use) so we don't ship large binaries in the repo.
 const photo = (id: string, w = 800) =>
@@ -276,16 +278,19 @@ export default function Home() {
             <p className="font-display text-xs uppercase tracking-[0.18em] text-clay-500">
               Why we built this
             </p>
-            <p className="mt-6 font-display text-2xl leading-relaxed text-ink sm:text-[1.7rem]">
-              I kept watching people I admire — the baker two doors down, the
-              florist who knows every regular by name — pour everything into
-              their craft, then feel a little guilty every time their Instagram
-              went quiet for a month. Marketing shouldn’t be a second full-time
-              job you never signed up for. So we built the quiet partner we
-              wished existed: one you can just text, and then get back to the
-              work you actually love.
+            <div className="mt-6 flex flex-col gap-4">
+              {FOUNDER_NOTE.map((para, i) => (
+                <p
+                  key={i}
+                  className="font-display text-2xl leading-relaxed text-ink sm:text-[1.7rem]"
+                >
+                  {para}
+                </p>
+              ))}
+            </div>
+            <p className="mt-8 text-sm text-ink/55">
+              — {FOUNDER_NAME}, {FOUNDER_ROLE}
             </p>
-            <p className="mt-8 text-sm text-ink/55">— Nasser, founder</p>
           </div>
         </div>
       </section>

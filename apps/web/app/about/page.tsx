@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { FOUNDER_NAME, FOUNDER_ROLE, FOUNDER_NOTE } from '../_lib/founder';
 
 export const metadata: Metadata = {
   title: 'About — AISSM',
@@ -66,21 +67,13 @@ export default function AboutPage() {
               How it started
             </p>
             <div className="mt-6 flex flex-col gap-4 text-lg leading-relaxed text-ink/80">
-              <p>
-                I kept watching people I admire — the baker two doors down, the
-                florist who knows every regular by name — pour everything into
-                their craft, then feel a little guilty every time their
-                Instagram went quiet for a month.
-              </p>
-              <p>
-                They didn’t need a fancier tool. They needed someone to just
-                take it off their plate. So we built the quiet partner we wished
-                existed: one you can text, that does the planning, writing, and
-                design, and then gets out of your way so you can get back to the
-                work you actually love.
-              </p>
+              {FOUNDER_NOTE.map((para, i) => (
+                <p key={i}>{para}</p>
+              ))}
             </div>
-            <p className="mt-8 text-sm text-ink/55">— Nasser, founder</p>
+            <p className="mt-8 text-sm text-ink/55">
+              — {FOUNDER_NAME}, {FOUNDER_ROLE}
+            </p>
           </div>
         </div>
       </section>
