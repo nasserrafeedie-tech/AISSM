@@ -6,6 +6,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { OperatorModule } from './operator/operator.module';
 import { ConciergeModule } from './concierge/concierge.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     OperatorModule,
     ConciergeModule,
     SchedulerModule,
+    BillingModule,
   ],
 })
 export class AppModule {}

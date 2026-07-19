@@ -1,5 +1,20 @@
-const PLANS = [
+'use client';
+
+import { useState } from 'react';
+
+type PlanId = 'starter' | 'growth' | 'pro';
+
+const PLANS: {
+  id: PlanId;
+  name: string;
+  price: string;
+  cadence: string;
+  blurb: string;
+  features: string[];
+  highlight: boolean;
+}[] = [
   {
+    id: 'starter',
     name: 'Starter',
     price: '$149',
     cadence: '/mo',
@@ -8,6 +23,7 @@ const PLANS = [
     highlight: false,
   },
   {
+    id: 'growth',
     name: 'Growth',
     price: '$349',
     cadence: '/mo',
@@ -21,6 +37,7 @@ const PLANS = [
     highlight: true,
   },
   {
+    id: 'pro',
     name: 'Pro',
     price: '$699',
     cadence: '/mo',
@@ -33,14 +50,41 @@ const PLANS = [
     ],
     highlight: false,
   },
-] as const;
+];
 
 /**
- * Billing surface. Each "Choose" button starts a Stripe Checkout session
- * (wired server-side once STRIPE_SECRET_KEY is set). Until then it's a clear,
- * honest placeholder — the real subscription lives in Stripe.
+ * Billing surface. Each "Choose" button starts a Stripe Checkout session via
+ * the backend (which flips on the moment STRIPE_SECRET_KEY + price IDs are set).
+ * Set NEXT_PUBLIC_API_URL to the deployed backend to make the buttons live;
+ * until then they show a friendly "coming soon" note.
  */
 export default function BillingPage() {
+  const [busy, setBusy] = useState<PlanId | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const api = process.env.NEXT_PUBLIC_API_URL;
+
+  async function choose(plan: PlanId) {
+    setNote(null);
+    if (!api) {
+      setNote('Checkout is almost ready — text us to get started today.');
+      return;
+    }
+    try {
+      setBusy(plan);
+      const res = await fetch(`${api}/billing/checkout`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const { url } = (await res.json()) as { url: string };
+      window.location.href = url;
+    } catch {
+      setNote('Something went wrong starting checkout. Please try again.');
+      setBusy(null);
+    }
+  }
+
   return (
     <main className="bg-warm-radial">
       <div className="mx-auto flex max-w-5xl flex-col gap-10 px-6 py-20">
@@ -57,7 +101,7 @@ export default function BillingPage() {
         <ul className="grid gap-5 md:grid-cols-3">
           {PLANS.map((plan) => (
             <li
-              key={plan.name}
+              key={plan.id}
               className={`flex flex-col rounded-4xl border p-7 shadow-soft transition ${
                 plan.highlight
                   ? 'border-clay-300 bg-white ring-2 ring-clay-400'
@@ -92,17 +136,23 @@ export default function BillingPage() {
               </ul>
               <button
                 type="button"
-                className={`mt-8 w-full rounded-full px-4 py-3 text-sm font-semibold transition ${
+                onClick={() => choose(plan.id)}
+                disabled={busy !== null}
+                className={`mt-8 w-full rounded-full px-4 py-3 text-sm font-semibold transition disabled:opacity-60 ${
                   plan.highlight
                     ? 'bg-clay-500 text-white hover:bg-clay-600'
                     : 'border border-ink/15 text-ink hover:border-ink/40'
                 }`}
               >
-                Choose {plan.name}
+                {busy === plan.id ? 'Starting…' : `Choose ${plan.name}`}
               </button>
             </li>
           ))}
         </ul>
+
+        {note && (
+          <p className="text-center text-sm text-clay-700">{note}</p>
+        )}
 
         <p className="text-center text-xs text-ink/45">
           Payments are processed securely by Stripe. We never store your card

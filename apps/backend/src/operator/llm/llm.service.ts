@@ -72,21 +72,51 @@ export class LlmService {
       );
       return this.fakeComplete(req);
     }
-    // Integration point: Anthropic Messages API. `cachedContext` goes in a
-    // system block with cache_control:{type:'ephemeral'} so each customer's
-    // brand_profile is cached across calls (§2 "~10x cheaper effective input").
-    //
-    //   messages.create({
-    //     model: this.model(req.tier),
-    //     max_tokens: req.maxTokens ?? 1024,
-    //     system: [{ type:'text', text: req.cachedContext,
-    //                cache_control:{ type:'ephemeral' } }],
-    //     messages: [{ role:'user', content: req.prompt }],
-    //   })
-    throw new Error(
-      `LLM call not yet implemented (model=${this.model(req.tier)}). ` +
-        'Wire the Anthropic SDK in LlmService.rawComplete.',
-    );
+
+    // Anthropic Messages API via plain fetch (no SDK dependency). The
+    // brand_profile goes in a system block with cache_control:{type:'ephemeral'}
+    // so it's cached across calls per customer (§2 "~10x cheaper effective
+    // input"). Flips on the moment ANTHROPIC_API_KEY is set.
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey as string,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: this.model(req.tier),
+        max_tokens: req.maxTokens ?? 1024,
+        system: [
+          {
+            type: 'text',
+            text: req.cachedContext,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+        messages: [{ role: 'user', content: req.prompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(
+        `Anthropic API ${res.status} ${res.statusText}${detail ? `: ${detail.slice(0, 300)}` : ''}`,
+      );
+    }
+
+    const data = (await res.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    const text = (data.content ?? [])
+      .filter((b) => b.type === 'text' && typeof b.text === 'string')
+      .map((b) => b.text as string)
+      .join('')
+      .trim();
+    if (!text) {
+      throw new Error('Anthropic API returned no text content');
+    }
+    return text;
   }
 
   /**
