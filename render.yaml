@@ -13,8 +13,10 @@ services:
     plan: free
     branch: main
     # Build the shared contracts, generate the Prisma client, then compile.
+    # --include=dev is required: NODE_ENV=production otherwise makes npm skip
+    # the build tools (nest CLI, typescript, prisma), which breaks the build.
     buildCommand: >-
-      npm install &&
+      npm install --include=dev &&
       npm run build:contracts &&
       npm --workspace @smm/backend run prisma:generate &&
       npm run build:backend
