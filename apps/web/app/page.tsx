@@ -42,14 +42,6 @@ const FAQS = [
     q: 'Do you need my passwords?',
     a: 'Never. You connect your accounts through a secure service, and we only ever get permission to post — not to see your login.',
   },
-  {
-    q: 'What if I’m too busy to reply that week?',
-    a: 'That’s the whole point. Once you trust us, you can let us post on autopilot — and we’ll still flag anything that needs a real decision.',
-  },
-  {
-    q: 'Can I cancel?',
-    a: 'Anytime, no contract and no awkward phone call. Text us the word “cancel” and you’re done.',
-  },
 ] as const;
 
 // Real faces make the difference between a template and a business people trust.
