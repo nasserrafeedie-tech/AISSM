@@ -16,10 +16,27 @@ const sans = Inter({
   display: 'swap',
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://aissm-web.vercel.app';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: 'AISSM — Your social media, handled',
   description:
     'Done-for-you social media for small businesses, run entirely over text. The calm alternative to a $1,500/mo agency.',
+  openGraph: {
+    title: 'AISSM — Your social media, handled',
+    description:
+      'Done-for-you social media for small businesses, run entirely over text. The calm alternative to a $1,500/mo agency.',
+    url: siteUrl,
+    siteName: 'AISSM',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'AISSM — Your social media, handled',
+    description:
+      'Done-for-you social media for small businesses, run entirely over text.',
+  },
 };
 
 function Header() {

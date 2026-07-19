@@ -36,6 +36,30 @@ const SAMPLES = [
   { file: 'cta.png', prompt: '“a come-visit-us post with our hours”' },
 ] as const;
 
+// The real questions owners ask before they trust us with their name online.
+const FAQS = [
+  {
+    q: 'Do I need to install or learn anything?',
+    a: 'No. There’s no app and no dashboard — everything happens right in your text messages. If you can text a friend, you can use this.',
+  },
+  {
+    q: 'What if I don’t like a post?',
+    a: 'Just say so. Text back “make it warmer” or “swap the photo” and we’ll redo it. Nothing goes out until you’re happy with it.',
+  },
+  {
+    q: 'Do you need my passwords?',
+    a: 'Never. You connect your accounts through a secure service, and we only ever get permission to post — not to see your login.',
+  },
+  {
+    q: 'What if I’m too busy to reply that week?',
+    a: 'That’s the whole point. Once you trust us, you can let us post on autopilot — and we’ll still flag anything that needs a real decision.',
+  },
+  {
+    q: 'Can I cancel?',
+    a: 'Anytime, no contract and no awkward phone call. Text us the word “cancel” and you’re done.',
+  },
+] as const;
+
 // Real faces make the difference between a template and a business people trust.
 const VOICES = [
   {
@@ -237,25 +261,54 @@ export default function Home() {
 
       {/* Why we built this — a personal, founder-voiced note */}
       <section className="border-y border-clay-100 bg-clay-50/40">
-        <div className="mx-auto max-w-3xl px-6 py-20">
-          <p className="font-display text-xs uppercase tracking-[0.18em] text-clay-500">
-            Why we built this
-          </p>
-          <p className="mt-6 font-display text-2xl leading-relaxed text-ink sm:text-[1.7rem]">
-            I kept watching people I admire — the baker two doors down, the
-            florist who knows every regular by name — pour everything into their
-            craft, then feel a little guilty every time their Instagram went
-            quiet for a month. Marketing shouldn’t be a second full-time job you
-            never signed up for. So we built the quiet partner we wished
-            existed: one you can just text, and then get back to the work you
-            actually love.
-          </p>
-          <p className="mt-8 text-sm text-ink/55">— Nasser, founder</p>
+        <div className="mx-auto grid max-w-5xl items-center gap-10 px-6 py-20 md:grid-cols-[240px_1fr] md:gap-14">
+          <div className="mx-auto w-48 md:mx-0 md:w-full">
+            <div className="overflow-hidden rounded-4xl border border-clay-100 bg-white shadow-soft">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/founder.jpg"
+                alt="Nasser, founder of AISSM"
+                className="aspect-[3/4] w-full object-cover"
+              />
+            </div>
+          </div>
+          <div>
+            <p className="font-display text-xs uppercase tracking-[0.18em] text-clay-500">
+              Why we built this
+            </p>
+            <p className="mt-6 font-display text-2xl leading-relaxed text-ink sm:text-[1.7rem]">
+              I kept watching people I admire — the baker two doors down, the
+              florist who knows every regular by name — pour everything into
+              their craft, then feel a little guilty every time their Instagram
+              went quiet for a month. Marketing shouldn’t be a second full-time
+              job you never signed up for. So we built the quiet partner we
+              wished existed: one you can just text, and then get back to the
+              work you actually love.
+            </p>
+            <p className="mt-8 text-sm text-ink/55">— Nasser, founder</p>
+          </div>
         </div>
       </section>
 
+      {/* FAQ */}
+      <section className="mx-auto max-w-3xl px-6 py-24">
+        <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+          Questions, answered.
+        </h2>
+        <dl className="mt-10 divide-y divide-clay-100 border-y border-clay-100">
+          {FAQS.map((f) => (
+            <div key={f.q} className="py-6">
+              <dt className="font-display text-lg font-medium text-ink">
+                {f.q}
+              </dt>
+              <dd className="mt-2 text-sm leading-relaxed text-ink/65">{f.a}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
       {/* CTA */}
-      <section className="mx-auto max-w-5xl px-6 py-24">
+      <section className="mx-auto max-w-5xl px-6 pb-24">
         <div className="rounded-4xl bg-ink px-8 py-14 text-center text-paper sm:px-16">
           <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
             Ready to stop worrying about posting?
