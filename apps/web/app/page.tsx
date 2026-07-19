@@ -226,6 +226,38 @@ export default function Home() {
             ))}
           </div>
 
+          {/* Reels — the Growth-plan differentiator, shown small and playing */}
+          <Reveal delay={100}>
+            <div className="mx-auto mt-16 flex max-w-3xl flex-col items-center gap-8 rounded-4xl border border-ink/10 bg-white p-8 shadow-soft sm:flex-row sm:gap-10 sm:p-10">
+              <div className="relative shrink-0">
+                <div
+                  aria-hidden
+                  className="absolute -inset-5 -z-10 rounded-full bg-clay-200/40 blur-2xl"
+                />
+                <video
+                  src="/samples/reel-demo.mp4"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-40 rounded-2xl border border-ink/10 shadow-lift"
+                  aria-label="Sample reel cut by the engine: a peek inside Rosa's coffee shop"
+                />
+              </div>
+              <div>
+                <p className="eyebrow">On Growth &amp; Pro</p>
+                <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+                  Film it. <span className="wonk italic text-clay-600">We’ll cut it.</span>
+                </h3>
+                <p className="mt-3 text-[15px] leading-relaxed text-ink/65">
+                  Send a few 10-second clips from your phone and we cut them
+                  into a branded reel — your colors, your type, a hook in the
+                  first three seconds. Real footage, never AI video.
+                </p>
+              </div>
+            </div>
+          </Reveal>
+
           <Reveal delay={120}>
             <p className="mx-auto mt-14 max-w-2xl text-center text-[15px] leading-relaxed text-ink/60">
               Every caption is written the way the platforms actually rank in
