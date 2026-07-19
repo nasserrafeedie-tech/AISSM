@@ -36,6 +36,9 @@ function Header() {
           <a className="hover:text-ink" href="/#how">
             How it works
           </a>
+          <a className="hover:text-ink" href="/demo">
+            See it work
+          </a>
           <a className="hover:text-ink" href="/billing">
             Pricing
           </a>
