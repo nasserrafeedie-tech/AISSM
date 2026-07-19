@@ -1,5 +1,3 @@
-import { FOUNDER_NAME, FOUNDER_ROLE, FOUNDER_NOTE } from './_lib/founder';
-
 // Warm, human-first landing page. Real photography is served straight from
 // Unsplash's CDN (free to use) so we don't ship large binaries in the repo.
 const photo = (id: string, w = 800) =>
@@ -21,14 +19,6 @@ const STEPS = [
     title: 'You reply “yes”',
     body: 'Approve with a word and we publish on schedule. Too busy? Let us post on autopilot once you trust us.',
   },
-] as const;
-
-// The kinds of small businesses we serve — real scenes, not clip art.
-const KINDS = [
-  { id: '1559925393-8be0ec4767c8', label: 'Cafés' },
-  { id: '1441986300917-64674bd600d8', label: 'Boutiques' },
-  { id: '1600891964092-4316c288032e', label: 'Restaurants' },
-  { id: '1453614512568-c4024d13c247', label: 'Coffee bars' },
 ] as const;
 
 const SAMPLES = [
@@ -146,32 +136,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Who it's for */}
-      <section className="mx-auto max-w-5xl px-6 pt-14">
-        <p className="text-center text-sm text-ink/50">
-          Made for the businesses that keep a neighborhood running
-        </p>
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {KINDS.map((k) => (
-            <div
-              key={k.label}
-              className="group relative overflow-hidden rounded-4xl border border-clay-100 shadow-soft"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={photo(k.id, 500)}
-                alt={k.label}
-                className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/60 to-transparent" />
-              <span className="absolute bottom-3 left-4 text-sm font-medium text-paper">
-                {k.label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* How it works */}
       <section id="how" className="mx-auto max-w-5xl px-6 py-20">
         <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -258,40 +222,6 @@ export default function Home() {
               </figcaption>
             </figure>
           ))}
-        </div>
-      </section>
-
-      {/* Why we built this — a personal, founder-voiced note */}
-      <section className="border-y border-clay-100 bg-clay-50/40">
-        <div className="mx-auto grid max-w-5xl items-center gap-10 px-6 py-20 md:grid-cols-[240px_1fr] md:gap-14">
-          <div className="mx-auto w-48 md:mx-0 md:w-full">
-            <div className="overflow-hidden rounded-4xl border border-clay-100 bg-white shadow-soft">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/founder.jpg"
-                alt="Nasser, founder of AISSM"
-                className="aspect-[3/4] w-full object-cover"
-              />
-            </div>
-          </div>
-          <div>
-            <p className="font-display text-xs uppercase tracking-[0.18em] text-clay-500">
-              Why we built this
-            </p>
-            <div className="mt-6 flex flex-col gap-4">
-              {FOUNDER_NOTE.map((para, i) => (
-                <p
-                  key={i}
-                  className="font-display text-2xl leading-relaxed text-ink sm:text-[1.7rem]"
-                >
-                  {para}
-                </p>
-              ))}
-            </div>
-            <p className="mt-8 text-sm text-ink/55">
-              — {FOUNDER_NAME}, {FOUNDER_ROLE}
-            </p>
-          </div>
         </div>
       </section>
 
