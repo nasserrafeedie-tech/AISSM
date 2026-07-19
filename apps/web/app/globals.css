@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    background-color: theme('colors.paper');
+    color: theme('colors.ink');
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Warm text selection */
+  ::selection {
+    background-color: theme('colors.clay.200');
+    color: theme('colors.ink');
+  }
+}
+
+@layer utilities {
+  /* Subtle warm wash used behind hero sections */
+  .bg-warm-radial {
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #F7E7D8 0%, transparent 55%),
+      radial-gradient(1000px 500px at 100% 0%, #F0EAD8 0%, transparent 50%);
+  }
+}

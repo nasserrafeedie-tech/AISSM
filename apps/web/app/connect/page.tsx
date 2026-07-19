@@ -1,11 +1,11 @@
 const PLATFORMS = [
-  'Instagram',
-  'Facebook',
-  'TikTok',
-  'X',
-  'LinkedIn',
-  'Threads',
-  'YouTube',
+  { name: 'Instagram', glyph: 'IG' },
+  { name: 'Facebook', glyph: 'f' },
+  { name: 'TikTok', glyph: '♪' },
+  { name: 'X', glyph: '𝕏' },
+  { name: 'LinkedIn', glyph: 'in' },
+  { name: 'Threads', glyph: '@' },
+  { name: 'YouTube', glyph: '▶' },
 ] as const;
 
 /**
@@ -15,29 +15,38 @@ const PLATFORMS = [
  */
 export default function ConnectPage() {
   return (
-    <main className="mx-auto flex max-w-xl flex-col gap-6 px-6 py-20">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Connect your accounts
-      </h1>
-      <p className="text-neutral-600">
-        Link the platforms you want us to post to. You can revoke access anytime.
-      </p>
-      <ul className="grid grid-cols-2 gap-3">
+    <main className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-20">
+      <div className="flex flex-col gap-3">
+        <h1 className="font-display text-4xl font-semibold tracking-tight">
+          Connect your accounts
+        </h1>
+        <p className="text-ink/60">
+          Link the platforms you’d like us to post to. You can revoke access at
+          any time, and we’ll only ever post what you approve.
+        </p>
+      </div>
+
+      <ul className="grid gap-3 sm:grid-cols-2">
         {PLATFORMS.map((p) => (
-          <li key={p}>
+          <li key={p.name}>
             <button
               type="button"
-              className="w-full rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left text-sm font-medium hover:border-neutral-400"
+              className="flex w-full items-center gap-3 rounded-2xl border border-clay-100 bg-white px-4 py-3.5 text-left text-sm font-medium shadow-soft transition hover:border-clay-300"
             >
-              Connect {p}
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-clay-50 font-display text-clay-600">
+                {p.glyph}
+              </span>
+              <span>Connect {p.name}</span>
+              <span className="ml-auto text-ink/30">→</span>
             </button>
           </li>
         ))}
       </ul>
-      <p className="text-xs text-neutral-500">
+
+      <div className="rounded-2xl border border-clay-100 bg-clay-50/50 px-5 py-4 text-xs leading-relaxed text-ink/55">
         Connections are handled securely through Post for Me. We never see your
-        passwords; access tokens are encrypted at rest.
-      </p>
+        passwords, and access tokens are encrypted at rest.
+      </div>
     </main>
   );
 }
