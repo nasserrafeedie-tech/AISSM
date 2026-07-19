@@ -1,6 +1,7 @@
 import { Reveal, RisingWords } from './_components/motion';
 import { HeroPhone } from './_components/hero-sms';
 import { Faq } from './_components/faq';
+import { LeadForm } from './_components/lead-form';
 import { SAMPLES } from './_lib/samples';
 
 // Real photography served straight from Unsplash's CDN (free license) so we
@@ -273,6 +274,9 @@ export default function Home() {
       <section className="mx-auto max-w-6xl px-6 py-28">
         <Reveal>
           <p className="eyebrow">№ 3 — The owners</p>
+          <p className="mt-3 max-w-md font-mono text-[11px] uppercase tracking-[0.16em] text-ink/45">
+            Illustrative voices — real customer reviews will live here after launch
+          </p>
         </Reveal>
 
         {/* One giant editorial pull-quote */}
@@ -372,12 +376,12 @@ export default function Home() {
               Pick a plan and we’ll take it from there — the rest happens in
               your messages.
             </p>
-            <a href="/billing" className="btn-clay mt-10">
-              Get started
-              <span aria-hidden className="btn-arrow">
-                →
-              </span>
-            </a>
+            <div className="mx-auto mt-10 flex max-w-md flex-col items-center gap-4">
+              <LeadForm source="homepage-cta" />
+              <a href="/billing" className="link-draw text-sm text-paper/60 hover:text-paper">
+                or see plans ↗
+              </a>
+            </div>
           </div>
         </Reveal>
       </section>

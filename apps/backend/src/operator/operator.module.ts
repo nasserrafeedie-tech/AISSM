@@ -9,6 +9,7 @@ import { PostForMeService } from './publishing/post-for-me.service';
 import { GraphicsService } from './graphics/graphics.service';
 import { BrandIdentityService } from './branding/brand-identity.service';
 import { ReelService } from './video/reel.service';
+import { StorageService } from '../common/storage.service';
 import { AssembleReelHandler } from './handlers/assemble-reel.handler';
 import { PlanWeekHandler } from './handlers/plan-week.handler';
 import { DraftPostHandler } from './handlers/draft-post.handler';
@@ -33,6 +34,7 @@ import { MakeGraphicHandler } from './handlers/make-graphic.handler';
     GraphicsService,
     BrandIdentityService,
     ReelService,
+    StorageService,
     // handlers
     PlanWeekHandler,
     DraftPostHandler,
@@ -55,6 +57,7 @@ import { MakeGraphicHandler } from './handlers/make-graphic.handler';
     TokenCryptoService,
     GraphicsService,
     PostForMeService,
+    StorageService,
   ],
 })
 export class OperatorModule {}

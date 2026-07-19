@@ -9,6 +9,8 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { BillingModule } from './billing/billing.module';
 import { ConnectModule } from './connect/connect.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { LeadsModule } from './leads/leads.module';
+import { AdminModule } from './admin/admin.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -30,6 +32,8 @@ import { HealthController } from './health/health.controller';
     BillingModule,
     ConnectModule,
     UploadsModule,
+    LeadsModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

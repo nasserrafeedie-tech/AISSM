@@ -6,6 +6,8 @@ export interface CheckoutRequest {
   plan: PlanId;
   /** Optional customer email to prefill Stripe Checkout. */
   email?: string;
+  /** Referral code from a ?ref= link. */
+  ref?: string;
 }
 
 export interface CheckoutResult {
@@ -64,6 +66,7 @@ export class BillingService {
     // start the SMS relationship. The plan rides along as metadata.
     form.set('phone_number_collection[enabled]', 'true');
     form.set('metadata[plan]', req.plan);
+    if (req.ref) form.set('metadata[ref]', req.ref.toUpperCase());
     if (req.email) form.set('customer_email', req.email);
 
     const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {

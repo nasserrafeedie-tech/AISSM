@@ -5,6 +5,7 @@ import { BillingService, type PlanId } from './billing.service';
 const CheckoutBody = z.object({
   plan: z.enum(['starter', 'growth', 'pro']),
   email: z.string().email().optional(),
+  ref: z.string().max(12).optional(),
 });
 
 /**
@@ -20,7 +21,7 @@ export class BillingController {
   async checkout(
     @Body() body: unknown,
   ): Promise<{ url: string; offline: boolean }> {
-    const { plan, email } = CheckoutBody.parse(body);
-    return this.billing.createCheckout({ plan: plan as PlanId, email });
+    const { plan, email, ref } = CheckoutBody.parse(body);
+    return this.billing.createCheckout({ plan: plan as PlanId, email, ref });
   }
 }

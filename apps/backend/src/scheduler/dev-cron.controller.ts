@@ -27,6 +27,18 @@ export class DevCronController {
     private readonly cron: CronService,
   ) {}
 
+  @Post('run-recap')
+  async runRecap(@Body() body: unknown): Promise<{ ok: boolean }> {
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_SMS !== '1') {
+      throw new NotFoundException();
+    }
+    const { from } = RunWeekBody.parse(body);
+    const customer = await this.prisma.customer.findUnique({ where: { phone: from } });
+    if (!customer) throw new NotFoundException();
+    await this.cron.sendRecap(customer.id);
+    return { ok: true };
+  }
+
   @Post('run-week')
   async runWeek(
     @Body() body: unknown,

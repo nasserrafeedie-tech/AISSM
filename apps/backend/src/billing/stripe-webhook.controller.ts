@@ -98,6 +98,26 @@ export class StripeWebhookController {
     });
     this.log.log(`checkout complete: ${customer.id} on ${plan}`);
 
+    // Referral credit: thank the referrer, remember who sent them. The actual
+    // billing credit is applied manually in Stripe for now — the important
+    // part is that neither side's goodwill falls on the floor.
+    const ref = obj.metadata?.ref;
+    if (ref) {
+      const referrer = await this.prisma.customer.findUnique({
+        where: { referralCode: ref },
+      });
+      if (referrer && referrer.id !== customer.id) {
+        await this.prisma.customer.update({
+          where: { id: customer.id },
+          data: { referredByCode: ref },
+        });
+        await this.concierge.notify(
+          referrer.id,
+          'Your referral just joined 🎉 A free month is coming off your next bill — thank you for spreading the word!',
+        );
+      }
+    }
+
     // First text goes out from us — the welcome doubles as onboarding Q1.
     await this.concierge.beginOnboarding(customer.id);
   }

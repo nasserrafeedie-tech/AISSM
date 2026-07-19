@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { GraphicsService } from '../graphics/graphics.service';
 import { CANVAS, type BrandTheme, type SlideSpec } from '../graphics/slide-templates';
 import { TaskHandler, ok, fail } from './handler.interface';
+import { StorageService } from '../../common/storage.service';
 
 /**
  * MAKE_GRAPHIC (§7). Render text slides / carousels to crisp PNGs (SVG→PNG, no
@@ -20,6 +21,7 @@ export class MakeGraphicHandler implements TaskHandler<'MAKE_GRAPHIC'> {
   constructor(
     private readonly prisma: PrismaService,
     private readonly graphics: GraphicsService,
+    private readonly storage: StorageService,
   ) {}
 
   async handle(task: Extract<Task, { type: 'MAKE_GRAPHIC' }>): Promise<Result> {
@@ -81,8 +83,7 @@ export class MakeGraphicHandler implements TaskHandler<'MAKE_GRAPHIC'> {
     const refs: string[] = [];
     for (let i = 0; i < pngs.length; i++) {
       const r2Key = `${task.customer_id}/${batch}/slide-${i + 1}.png`;
-      const filePath = join(mediaDir, r2Key);
-      writeFileSync(filePath, pngs[i]);
+      await this.storage.put(r2Key, pngs[i], 'image/png');
       await this.prisma.mediaAsset.create({
         data: {
           customerId: task.customer_id,

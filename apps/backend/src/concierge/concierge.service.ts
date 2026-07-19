@@ -68,6 +68,22 @@ export class ConciergeService {
         `Happy to bump you up! Growth adds reels cut from your own clips, more posts, and more platforms — upgrade here: ${site}/billing`,
       );
     }
+    if (kw === 'refer') {
+      let code = customer.referralCode;
+      if (!code) {
+        code = customer.id.replace(/-/g, '').slice(0, 6).toUpperCase();
+        await this.prisma.customer.update({
+          where: { id: customer.id },
+          data: { referralCode: code },
+        });
+      }
+      const site = process.env.PUBLIC_SITE_URL ?? 'https://aissm-web.vercel.app';
+      return this.reply(
+        customer.phone,
+        conversation.id,
+        `Know another owner who'd love this? Send them your link — when they join, you BOTH get a month free: ${site}/billing?ref=${code}`,
+      );
+    }
     if (kw === 'autopilot') {
       await this.prisma.customer.update({
         where: { id: customer.id },

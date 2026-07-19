@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Reveal, RisingWords } from '../_components/motion';
 
 type PlanId = 'starter' | 'growth' | 'pro';
@@ -68,6 +68,13 @@ export default function BillingPage() {
   const [busy, setBusy] = useState<PlanId | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const api = process.env.NEXT_PUBLIC_API_URL;
+  const [ref, setRef] = useState<string | null>(null);
+
+  // Referral links look like /billing?ref=ABC123 — carry the code through
+  // checkout so the webhook can credit both sides.
+  useEffect(() => {
+    setRef(new URLSearchParams(window.location.search).get('ref'));
+  }, []);
 
   async function choose(plan: PlanId) {
     setNote(null);
@@ -80,7 +87,7 @@ export default function BillingPage() {
       const res = await fetch(`${api}/billing/checkout`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, ...(ref ? { ref } : {}) }),
       });
       if (!res.ok) throw new Error(String(res.status));
       const { url } = (await res.json()) as { url: string };

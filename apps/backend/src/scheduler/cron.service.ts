@@ -158,6 +158,40 @@ export class CronService {
     }
   }
 
+  /** Friday recap — the service proving it worked this week (retention §2). */
+  @Cron('0 16 * * 5')
+  async weeklyRecap(): Promise<void> {
+    if (!this.enabled) return;
+    for (const id of await this.activeCustomerIds()) {
+      await this.sendRecap(id).catch((e) =>
+        this.log.warn(`recap failed for ${id}: ${e.message}`),
+      );
+    }
+  }
+
+  async sendRecap(customerId: string): Promise<void> {
+    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+    const [published, scheduled] = await Promise.all([
+      this.prisma.post.count({
+        where: { customerId, status: 'published', updatedAt: { gte: since } },
+      }),
+      this.prisma.post.count({
+        where: { customerId, status: 'scheduled' },
+      }),
+    ]);
+    if (published === 0 && scheduled === 0) return; // nothing to brag about
+    const bits = [
+      published
+        ? `${published} post${published > 1 ? 's' : ''} went out this week`
+        : null,
+      scheduled ? `${scheduled} lined up for next week` : null,
+    ].filter(Boolean);
+    await this.concierge.notify(
+      customerId,
+      `Friday check-in ✳ ${bits.join(', ')}. Have a great weekend — I've got the feed.`,
+    );
+  }
+
   /** Daily: pull fresh metrics so next week's plan learns from results. */
   @Cron('0 6 * * *')
   async fetchMetrics(): Promise<void> {

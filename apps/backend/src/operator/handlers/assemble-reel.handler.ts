@@ -13,6 +13,7 @@ import { GraphicsService } from '../graphics/graphics.service';
 import type { BrandTheme } from '../graphics/slide-templates';
 import { ReelService } from '../video/reel.service';
 import { TaskHandler, ok, fail } from './handler.interface';
+import { StorageService } from '../../common/storage.service';
 
 /**
  * ASSEMBLE_REEL (§7, Growth+). Take the owner's banked clips, cut them into a
@@ -32,6 +33,7 @@ export class AssembleReelHandler implements TaskHandler<'ASSEMBLE_REEL'> {
     private readonly llm: LlmService,
     private readonly moderation: ModerationService,
     private readonly gate: PublishGateService,
+    private readonly storage: StorageService,
   ) {}
 
   async handle(task: Extract<Task, { type: 'ASSEMBLE_REEL' }>): Promise<Result> {
@@ -126,8 +128,7 @@ export class AssembleReelHandler implements TaskHandler<'ASSEMBLE_REEL'> {
     // Store the mp4 exactly like other assembled media.
     const batch = randomUUID();
     const r2Key = `${task.customer_id}/${batch}/reel.mp4`;
-    mkdirSync(join(mediaDir, task.customer_id, batch), { recursive: true });
-    writeFileSync(join(mediaDir, r2Key), mp4);
+    await this.storage.put(r2Key, mp4, 'video/mp4');
 
     // Caption via the same playbook-driven path as any other post.
     const gen = await this.llm.completeJson(
@@ -189,10 +190,9 @@ export class AssembleReelHandler implements TaskHandler<'ASSEMBLE_REEL'> {
       },
     });
 
-    const base = (process.env.PUBLIC_BASE_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
     return ok(
       task.task_id,
-      `Your reel is ready 🎬 (${clipPaths.length} clips) — watch it here: ${base}/media/${r2Key}\n\nReply “yes” to schedule it, or tell me what to change.`,
+      `Your reel is ready 🎬 (${clipPaths.length} clips) — watch it here: ${this.storage.publicUrl(r2Key)}\n\nReply “yes” to schedule it, or tell me what to change.`,
       'pending_approval',
       { post_id: post.id, media_ref: r2Key, clip_count: clipPaths.length, bytes: mp4.length },
     );

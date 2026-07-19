@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Fraunces, Instrument_Sans, Space_Mono } from 'next/font/google';
 import './globals.css';
 import { SiteHeader, SiteFooter } from './_components/chrome';
+import { Analytics } from '@vercel/analytics/react';
 
 /**
  * Type system: Fraunces (a warm, characterful serif with optical sizing and a
@@ -70,6 +71,7 @@ export default function RootLayout({
         <SiteHeader />
         <div className="flex-1">{children}</div>
         <SiteFooter />
+        <Analytics />
       </body>
     </html>
   );

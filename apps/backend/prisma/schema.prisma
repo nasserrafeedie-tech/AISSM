@@ -119,6 +119,9 @@ model Customer {
   trustLevel      TrustLevel     @default(approve_all) // §8: everyone starts here
   status          CustomerStatus @default(onboarding)
   stripeCustomerId String?       @unique
+  // Referral loop: my shareable code, and the code that brought me here.
+  referralCode    String?        @unique
+  referredByCode  String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -337,4 +340,16 @@ model Result {
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@map("results")
+}
+
+// ─── leads (pre-launch waitlist + interested visitors) ───────────────────
+model Lead {
+  id        String   @id @default(uuid()) @db.Uuid
+  phone     String   @unique
+  email     String?
+  source    String   @default("website")
+  notified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("leads")
 }

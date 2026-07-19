@@ -16,6 +16,7 @@ import type { Task } from '@smm/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskBus } from '../tasks/task-bus.service';
 import { ConciergeService } from '../concierge/concierge.service';
+import { StorageService } from '../common/storage.service';
 
 interface UploadedFileShape {
   originalname: string;
@@ -42,6 +43,7 @@ export class UploadsController {
     private readonly prisma: PrismaService,
     private readonly bus: TaskBus,
     private readonly concierge: ConciergeService,
+    private readonly storage: StorageService,
   ) {}
 
   @Post()
@@ -65,8 +67,7 @@ export class UploadsController {
       }
       const ext = f.mimetype.split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'bin';
       const r2Key = `${customerId}/uploads/${randomUUID()}.${ext}`;
-      mkdirSync(join(mediaDir, customerId, 'uploads'), { recursive: true });
-      writeFileSync(join(mediaDir, r2Key), f.buffer);
+      await this.storage.put(r2Key, f.buffer, f.mimetype);
       await this.prisma.mediaAsset.create({
         data: {
           customerId,
