@@ -38,7 +38,7 @@ export default function AboutPage() {
           </p>
           <h1 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
             The marketing department small businesses{' '}
-            <span className="italic text-clay-600">can’t afford to hire.</span>
+            <span className="italic text-clay-600">can finally afford.</span>
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-ink/70">
             AISSM plans, writes, designs, and publishes social media for local
