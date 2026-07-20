@@ -51,6 +51,10 @@ export const metadata: Metadata = {
     description:
       'Done-for-you social media for small businesses, run entirely over text.',
   },
+  icons: {
+    apple: '/apple-touch-icon.png',
+    other: [{ rel: 'icon', url: '/icon-512.png', sizes: '512x512' }],
+  },
 };
 
 export default function RootLayout({

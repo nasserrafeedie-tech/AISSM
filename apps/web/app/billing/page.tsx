@@ -208,6 +208,12 @@ export default function BillingPage() {
         <p className="mt-3 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink/55">
           Payments handled securely by Stripe — we never see your card
         </p>
+
+        <p className="mx-auto mt-6 max-w-md text-center text-xs leading-relaxed text-ink/50">
+          By subscribing you agree to receive texts from Handled to deliver the
+          service. Msg &amp; data rates may apply. Reply STOP to cancel, HELP
+          for help.
+        </p>
       </div>
     </main>
   );

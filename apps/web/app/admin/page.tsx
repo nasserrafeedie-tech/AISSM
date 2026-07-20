@@ -41,8 +41,17 @@ export default function AdminPage() {
             ))}
           </div>
           <Section title={`Leads (${data.leads.length})`}
-            rows={data.leads.map((l: any) => [l.phone, l.email ?? '—', l.source, new Date(l.createdAt).toLocaleString()])}
-            head={['phone', 'email', 'source', 'when']} />
+            rows={data.leads.map((l: any) => [
+              l.phone,
+              l.email ?? '—',
+              l.source,
+              // Launch day: only text the ✓ rows. No consent, no marketing text.
+              l.smsConsent
+                ? `✓ ${l.smsConsentAt ? new Date(l.smsConsentAt).toLocaleString() : ''}`
+                : '✗ no consent',
+              new Date(l.createdAt).toLocaleString(),
+            ])}
+            head={['phone', 'email', 'source', 'sms consent', 'when']} />
           <Section title={`Customers (${data.customers.length})`}
             rows={data.customers.map((c: any) => [c.phone, c.businessName ?? '—', c.plan, c.status, c.trust, c.onboarded ? '✓' : '…', c.referralCode ?? '—'])}
             head={['phone', 'business', 'plan', 'status', 'trust', 'onboarded', 'ref code']} />
