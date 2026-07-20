@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LlmService } from '../llm/llm.service';
 import type { BrandStyle } from '../graphics/slide-templates';
+import { verticalFor } from '../llm/vertical-playbook';
 
 /**
  * Gives every business its own look.
@@ -130,6 +131,16 @@ const FALLBACK: Identity[] = [
   { primary: '#26463B', secondary: '#E0B04A', style: 'editorial' },
 ];
 
+const LlmStrategy = z
+  .object({
+    mix: z.string().max(400),
+    ideas: z.array(z.string().max(200)).min(4).max(8),
+    photo_asks: z.array(z.string().max(200)).min(2).max(4),
+    reel_clips: z.array(z.string().max(200)).length(3),
+    reel_hook: z.string().max(80),
+  })
+  .strict();
+
 const LlmIdentity = z
   .object({
     business_name: z.string().max(60).optional(),
@@ -182,6 +193,56 @@ export class BrandIdentityService {
     this.log.log(
       `identity for ${customerId}: ${identity.primary}/${identity.secondary} ${identity.style}${name ? ` "${name}"` : ''}`,
     );
+
+    // The customer's own strategy file: Claude reads their exact onboarding
+    // words plus our researched playbook for their trade, and writes a plan
+    // specific to THEM — the late-night taco truck gets a different file than
+    // the brunch taqueria. One call, stored, reused every week.
+    await this.synthesizeStrategy(customerId);
+  }
+
+  async synthesizeStrategy(customerId: string): Promise<void> {
+    const llmOn =
+      Boolean(process.env.ANTHROPIC_API_KEY) && process.env.LLM_FAKE !== '1';
+    if (!llmOn) return; // playbook fallback covers free mode
+    const profile = await this.prisma.brandProfile.findUnique({
+      where: { customerId },
+    });
+    if (!profile || profile.contentStrategy) return; // once per customer
+    const v = verticalFor(profile.businessType);
+    try {
+      const strategy = await this.llm.completeJson(
+        {
+          tier: 'voice',
+          cachedContext:
+            'You are a social media strategist for one specific local business. ' +
+            'Write a content strategy from the owner\'s own words. Return ONLY ' +
+            'JSON: {"mix": one-line weekly mix, "ideas": 6 post ideas specific ' +
+            'to THIS business (use their offers, audience, and voice — never ' +
+            'generic), "photo_asks": 3 photo requests for authentic moments, ' +
+            '"reel_clips": exactly 3 clip requests forming one coherent reel, ' +
+            '"reel_hook": on-screen hook under 60 chars}. Authentic beats ' +
+            'polished; transformations and process win; sends and saves are ' +
+            'the goal.',
+          prompt:
+            `Owner's words — business: "${profile.businessType}" · voice: ` +
+            `"${profile.voiceTone}" · audience: "${profile.targetCustomer}" · ` +
+            `offers: ${profile.offers.join('; ')}\n` +
+            `Researched baseline for this trade (improve on it, don't copy):\n` +
+            `mix: ${v.mix}\nideas: ${v.ideas.join(' | ')}\n` +
+            `reel: ${v.reelClips.join(' → ')} (hook: ${v.reelHook})`,
+          maxTokens: 900,
+        },
+        LlmStrategy,
+      );
+      await this.prisma.brandProfile.update({
+        where: { customerId },
+        data: { contentStrategy: strategy },
+      });
+      this.log.log(`bespoke strategy written for ${customerId}`);
+    } catch (err) {
+      this.log.warn(`strategy synthesis failed (playbook fallback): ${String(err)}`);
+    }
   }
 
   /**

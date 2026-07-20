@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { LlmService } from '../llm/llm.service';
 import { buildBrandContext } from '../llm/brand-context';
-import { planningGuidance } from '../llm/vertical-playbook';
+import { resolveStrategy, strategyPlanningBlock } from '../llm/vertical-playbook';
 import { TaskHandler, ok, fail } from './handler.interface';
 
 /**
@@ -54,7 +54,7 @@ export class PlanWeekHandler implements TaskHandler<'PLAN_WEEK'> {
       'Mix archetypes across the week (promo, behind_the_scenes, testimonial,',
       'educational_tip, product_spotlight, seasonal, ugc_repost, were_open).',
       'Prefer slots that use the owner\'s real photos.',
-      planningGuidance(profile.businessType),
+      strategyPlanningBlock(resolveStrategy(profile)),
       recentMetrics.length
         ? `Recent performance signal (impressions): ${recentMetrics
             .map((m) => m.impressions)

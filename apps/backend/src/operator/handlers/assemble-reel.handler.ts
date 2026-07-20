@@ -14,7 +14,7 @@ import type { BrandTheme } from '../graphics/slide-templates';
 import { ReelService } from '../video/reel.service';
 import { TaskHandler, ok, fail } from './handler.interface';
 import { StorageService } from '../../common/storage.service';
-import { verticalFor } from '../llm/vertical-playbook';
+import { resolveStrategy } from '../llm/vertical-playbook';
 
 /**
  * ASSEMBLE_REEL (§7, Growth+). Take the owner's banked clips, cut them into a
@@ -113,7 +113,7 @@ export class AssembleReelHandler implements TaskHandler<'ASSEMBLE_REEL'> {
         clipPaths: clipPaths.map((c) => c.path),
         hookText:
           task.payload.hook_text ??
-          verticalFor(profile.businessType).reelHook,
+          resolveStrategy(profile).reel_hook,
         endCardPng,
         accentHex: profile.brandColors?.[1],
         fontPath: bundledFont(),

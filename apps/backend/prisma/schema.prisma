@@ -177,6 +177,10 @@ model BrandProfile {
   // derived from the business at the end of onboarding. Persisted so a brand
   // looks the same every week.
   visualStyle        String?
+  // Bespoke content strategy written by Claude at onboarding completion from
+  // THIS business's own words (mix, ideas, photo asks, reel recipe, hook).
+  // Null = fall back to the static vertical playbook. One call per customer.
+  contentStrategy    Json?
   logoRef            String?
   referencePhotoRefs String[]
   // Onboarding progress is tracked as which fields are filled, not a step

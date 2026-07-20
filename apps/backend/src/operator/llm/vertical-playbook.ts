@@ -291,3 +291,56 @@ export function draftGuidance(businessType: string | null | undefined): string {
     `If the archetype fits, draw on ideas like: ${v.ideas.slice(0, 3).join(' · ')}`,
   ].join('\n');
 }
+
+/** The per-customer strategy "file" shape stored in BrandProfile.contentStrategy. */
+export interface CustomerStrategy {
+  mix: string;
+  ideas: string[];
+  photo_asks: string[];
+  reel_clips: [string, string, string];
+  reel_hook: string;
+}
+
+/**
+ * Bespoke first, playbook second. Each customer gets their own strategy file
+ * written by Claude at onboarding from THEIR words; until it exists (or when
+ * running free/offline) the researched vertical playbook fills in.
+ */
+export function resolveStrategy(profile: {
+  businessType?: string | null;
+  contentStrategy?: unknown;
+}): CustomerStrategy {
+  const cs = profile.contentStrategy as Partial<CustomerStrategy> | null | undefined;
+  if (
+    cs &&
+    typeof cs.mix === 'string' &&
+    Array.isArray(cs.ideas) &&
+    cs.ideas.length >= 3 &&
+    Array.isArray(cs.reel_clips) &&
+    cs.reel_clips.length === 3
+  ) {
+    return {
+      mix: cs.mix,
+      ideas: cs.ideas as string[],
+      photo_asks: (cs.photo_asks as string[]) ?? [],
+      reel_clips: cs.reel_clips as [string, string, string],
+      reel_hook: (cs.reel_hook as string) ?? 'A little peek inside',
+    };
+  }
+  const v = verticalFor(profile.businessType);
+  return {
+    mix: v.mix,
+    ideas: v.ideas,
+    photo_asks: v.photoAsks,
+    reel_clips: v.reelClips,
+    reel_hook: v.reelHook,
+  };
+}
+
+export function strategyPlanningBlock(s: CustomerStrategy): string {
+  return [
+    `CONTENT STRATEGY FOR THIS BUSINESS: ${s.mix}`,
+    'Plan slots around these ideas, varied across the week:',
+    ...s.ideas.map((i) => `- ${i}`),
+  ].join('\n');
+}

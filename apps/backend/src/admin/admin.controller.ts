@@ -21,7 +21,7 @@ export class AdminController {
       this.prisma.customer.findMany({
         orderBy: { createdAt: 'desc' },
         take: 100,
-        include: { brandProfile: { select: { businessType: true, onboardingComplete: true } } },
+        include: { brandProfile: { select: { businessType: true, onboardingComplete: true, contentStrategy: true } } },
       }),
       this.prisma.post.findMany({
         orderBy: { createdAt: 'desc' },
@@ -50,6 +50,7 @@ export class AdminController {
         business: c.brandProfile?.businessType ?? null,
         onboarded: c.brandProfile?.onboardingComplete ?? false,
         referralCode: c.referralCode, referredBy: c.referredByCode,
+        strategy: c.brandProfile?.contentStrategy ?? null,
         created: c.createdAt,
       })),
       recentPosts, failedPosts,

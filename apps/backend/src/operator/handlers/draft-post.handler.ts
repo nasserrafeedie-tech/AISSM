@@ -9,7 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { LlmService } from '../llm/llm.service';
 import { buildBrandContext } from '../llm/brand-context';
 import { playbookFor, ALT_TEXT_RULE } from '../llm/playbook';
-import { draftGuidance } from '../llm/vertical-playbook';
+import { resolveStrategy } from '../llm/vertical-playbook';
 import { ModerationService } from '../guardrails/moderation.service';
 import { PublishGateService } from '../guardrails/publish-gate.service';
 import { TaskHandler, ok, fail } from './handler.interface';
@@ -65,7 +65,7 @@ export class DraftPostHandler implements TaskHandler<'DRAFT_POST'> {
       // How this platform actually ranks content — see llm/playbook.ts.
       playbookFor(platform),
       '',
-      draftGuidance(profile.businessType),
+      (() => { const st = resolveStrategy(profile); return `STRATEGY FOR THIS BUSINESS: ${st.mix}\nIf the archetype fits, draw on: ${st.ideas.slice(0, 3).join(' · ')}`; })(),
       '',
       recent.length
         ? [

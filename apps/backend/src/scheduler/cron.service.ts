@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TaskBus } from '../tasks/task-bus.service';
 import { ConciergeService } from '../concierge/concierge.service';
 import { zonedToUtc } from '../common/time';
-import { verticalFor } from '../operator/llm/vertical-playbook';
+import { resolveStrategy } from '../operator/llm/vertical-playbook';
 
 /** Shape of the PLAN_WEEK Result we care about. */
 type PlanResult = { data?: { slots?: CalendarSlot[] } };
@@ -133,9 +133,9 @@ export class CronService {
         // recipe is designed so the cut can't miss.
         const profile = await this.prisma.brandProfile.findUnique({
           where: { customerId },
-          select: { businessType: true },
+          select: { businessType: true, contentStrategy: true },
         });
-        const v = verticalFor(profile?.businessType);
+        const v = { key: 'custom', reelClips: resolveStrategy(profile ?? {}).reel_clips };
         await this.prisma.shotListRequest.create({
           data: {
             customerId,
