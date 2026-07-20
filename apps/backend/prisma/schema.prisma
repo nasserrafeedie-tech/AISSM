@@ -133,8 +133,25 @@ model Customer {
   conversation     Conversation?
   tasks            Task[]
   metrics          Metric[]
+  queuedTexts      QueuedText[]
 
   @@map("customers")
+}
+
+// Unprompted texts held for the recipient's 8:00–21:00 local window (TCPA
+// quiet hours). Replies to an active conversation bypass this entirely.
+model QueuedText {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @db.Uuid
+  body       String
+  sendAfter  DateTime
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([sentAt, sendAfter])
+  @@map("queued_texts")
 }
 
 // ─── connected_accounts (tokens encrypted at rest, §8) ───────────────────
@@ -348,12 +365,16 @@ model Result {
 
 // ─── leads (pre-launch waitlist + interested visitors) ───────────────────
 model Lead {
-  id        String   @id @default(uuid()) @db.Uuid
-  phone     String   @unique
-  email     String?
-  source    String   @default("website")
-  notified  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id             String    @id @default(uuid()) @db.Uuid
+  phone          String    @unique
+  email          String?
+  source         String    @default("website")
+  notified       Boolean   @default(false)
+  // TCPA audit trail: the exact consent language shown and when it was agreed to.
+  smsConsent     Boolean?
+  smsConsentText String?
+  smsConsentAt   DateTime?
+  createdAt      DateTime  @default(now())
 
   @@map("leads")
 }

@@ -90,11 +90,13 @@ export class UploadsController {
       void this.concierge.notify(
         customerId,
         'Got your videos! Quick note — reels are part of the Growth plan. Reply UPGRADE and I\'ll send the details, or I\'ll keep them on file.',
+        { promptedByOwner: true },
       );
     } else {
       void this.concierge.notify(
         customerId,
         `Got ${files.length === 1 ? 'it' : `all ${files.length}`} — thank you! 📥`,
+        { promptedByOwner: true },
       );
     }
 
@@ -113,11 +115,17 @@ export class UploadsController {
         created_at: new Date().toISOString(),
       } as Task;
       const result = await this.bus.emit(task);
-      await this.concierge.notify(customerId, result.summary_for_owner);
+      await this.concierge.notify(customerId, result.summary_for_owner, {
+        promptedByOwner: true,
+      });
     } catch (err) {
       this.log.error(`background reel failed for ${customerId}: ${String(err)}`);
       await this.concierge
-        .notify(customerId, 'I hit a snag cutting your reel — give me a bit and I\'ll try again.')
+        .notify(
+          customerId,
+          'I hit a snag cutting your reel — give me a bit and I\'ll try again.',
+          { promptedByOwner: true },
+        )
         .catch(() => undefined);
     }
   }

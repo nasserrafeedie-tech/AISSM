@@ -45,6 +45,56 @@ export function formatInZone(when: Date, timeZone: string): string {
   }
 }
 
+/**
+ * TCPA texting window: 8:00–21:00 in the recipient's own zone. Unprompted
+ * texts outside it are queued, not sent (quiet-hours rule; replies to an
+ * active conversation are exempt and never come through here).
+ */
+export const TEXTING_WINDOW = { open: 8, close: 21 } as const;
+
+/** The hour (0–23) on the recipient's wall clock at a given instant. */
+export function hourInZone(when: Date, timeZone: string): number {
+  try {
+    const hour = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour: 'numeric',
+      hourCycle: 'h23',
+    }).format(when);
+    return Number(hour);
+  } catch {
+    return when.getUTCHours(); // unknown zone → UTC, consistent with zoneOffsetMs
+  }
+}
+
+/** Is it currently OK to send an unprompted text to this zone? */
+export function inTextingWindow(when: Date, timeZone: string): boolean {
+  const h = hourInZone(when, timeZone);
+  return h >= TEXTING_WINDOW.open && h < TEXTING_WINDOW.close;
+}
+
+/**
+ * The next instant the texting window opens in the recipient's zone: today's
+ * 8:00 if it's still ahead of them, otherwise tomorrow's. DST is handled by
+ * zonedToUtc for the specific date.
+ */
+export function nextTextingWindowOpen(now: Date, timeZone: string): Date {
+  const localDate = (d: Date) => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(d);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '01';
+    return `${get('year')}-${get('month')}-${get('day')}`;
+  };
+  const openTime = `${String(TEXTING_WINDOW.open).padStart(2, '0')}:00`;
+  const todayOpen = zonedToUtc(localDate(now), openTime, timeZone);
+  if (todayOpen > now) return todayOpen;
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  return zonedToUtc(localDate(tomorrow), openTime, timeZone);
+}
+
 /** Tomorrow at 9am in the business's zone, as a UTC instant. */
 export function tomorrowMorningInZone(timeZone: string): Date {
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);

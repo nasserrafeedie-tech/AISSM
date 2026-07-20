@@ -6,7 +6,12 @@ import { TaskBus } from '../tasks/task-bus.service';
 import { TwilioService } from './twilio.service';
 import { OnboardingService } from './onboarding.service';
 import { IntentService } from './intent.service';
-import { formatInZone, tomorrowMorningInZone } from '../common/time';
+import {
+  formatInZone,
+  inTextingWindow,
+  nextTextingWindowOpen,
+  tomorrowMorningInZone,
+} from '../common/time';
 
 export interface InboundSms {
   from: string; // E.164
@@ -210,6 +215,7 @@ export class ConciergeService {
         const more = await this.presentNextDraft(
           customerId,
           result.summary_for_owner,
+          { promptedByOwner: true },
         );
         if (!more) {
           const offer = await this.trustRampOffer(customerId);
@@ -244,6 +250,7 @@ export class ConciergeService {
         const more = await this.presentNextDraft(
           customerId,
           result.summary_for_owner,
+          { promptedByOwner: true },
         );
         if (!more) {
           await this.reply(
@@ -281,7 +288,11 @@ export class ConciergeService {
    * one path that starts a conversation, so it resolves (or creates) the
    * thread itself.
    */
-  async notify(customerId: string, body: string): Promise<void> {
+  async notify(
+    customerId: string,
+    body: string,
+    opts?: { promptedByOwner?: boolean },
+  ): Promise<void> {
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       include: { conversation: true },
@@ -290,10 +301,72 @@ export class ConciergeService {
       this.log.warn(`notify: no customer ${customerId}`);
       return;
     }
+    // Quiet hours (TCPA): unprompted texts only between 8:00 and 21:00 on the
+    // owner's own clock. Outside that, hold it for the next window. Exempt:
+    // anything the owner just asked for — a reply mid-conversation, an upload
+    // confirmation, the welcome right after checkout. They're awake; answer.
+    const now = new Date();
+    if (!opts?.promptedByOwner && !inTextingWindow(now, customer.timezone)) {
+      const sendAfter = nextTextingWindowOpen(now, customer.timezone);
+      await this.prisma.queuedText.create({
+        data: { customerId, body, sendAfter },
+      });
+      this.log.log(
+        `quiet hours for ${customerId} (${customer.timezone}) — queued until ${sendAfter.toISOString()}`,
+      );
+      return;
+    }
     const conversation =
       customer.conversation ??
       (await this.prisma.conversation.create({ data: { customerId } }));
     await this.reply(customer.phone, conversation.id, body);
+  }
+
+  /**
+   * Send whatever the quiet-hours queue is holding, oldest first, once the
+   * recipient's window is open. Called by cron every 15 minutes. A row whose
+   * zone is somehow still outside the window (DST shifted overnight) is
+   * re-queued for the next opening; rows for customers who stopped or
+   * cancelled in the meantime are dropped unsent.
+   */
+  async flushQueuedTexts(): Promise<number> {
+    const due = await this.prisma.queuedText.findMany({
+      where: { sentAt: null, sendAfter: { lte: new Date() } },
+      orderBy: { createdAt: 'asc' },
+      include: { customer: { include: { conversation: true } } },
+    });
+    let sent = 0;
+    for (const item of due) {
+      const customer = item.customer;
+      if (!customer || !['active', 'onboarding'].includes(customer.status)) {
+        await this.prisma.queuedText.delete({ where: { id: item.id } });
+        this.log.log(
+          `quiet-hours queue: dropped text for ${item.customerId} (status ${customer?.status ?? 'gone'})`,
+        );
+        continue;
+      }
+      const now = new Date();
+      if (!inTextingWindow(now, customer.timezone)) {
+        await this.prisma.queuedText.update({
+          where: { id: item.id },
+          data: { sendAfter: nextTextingWindowOpen(now, customer.timezone) },
+        });
+        continue;
+      }
+      const conversation =
+        customer.conversation ??
+        (await this.prisma.conversation.create({
+          data: { customerId: customer.id },
+        }));
+      await this.reply(customer.phone, conversation.id, item.body);
+      await this.prisma.queuedText.update({
+        where: { id: item.id },
+        data: { sentAt: new Date() },
+      });
+      sent++;
+    }
+    if (sent) this.log.log(`quiet-hours queue: sent ${sent}`);
+    return sent;
   }
 
   /**
@@ -306,7 +379,10 @@ export class ConciergeService {
     });
     const first = this.onboarding.nextField(profile);
     if (!first) return; // already fully onboarded (re-subscribe, plan change)
-    await this.notify(customerId, this.onboarding.question(first, profile));
+    // The owner just checked out and is watching their phone for this text.
+    await this.notify(customerId, this.onboarding.question(first, profile), {
+      promptedByOwner: true,
+    });
   }
 
   /**
@@ -316,7 +392,11 @@ export class ConciergeService {
    *
    * Returns false when the queue is empty.
    */
-  async presentNextDraft(customerId: string, lead?: string): Promise<boolean> {
+  async presentNextDraft(
+    customerId: string,
+    lead?: string,
+    opts?: { promptedByOwner?: boolean },
+  ): Promise<boolean> {
     const [next, customer] = await Promise.all([
       this.prisma.post.findFirst({
         where: { customerId, status: 'pending_approval' },
@@ -337,7 +417,7 @@ export class ConciergeService {
       (lead ? `${lead}\n\n` : '') +
       `Draft${when}:\n\n“${preview(next.caption ?? '')}”\n\n` +
       'Reply “yes” to schedule it, or tell me what to change.';
-    await this.notify(customerId, body);
+    await this.notify(customerId, body, opts);
     return true;
   }
 

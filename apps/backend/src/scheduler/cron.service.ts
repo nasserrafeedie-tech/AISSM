@@ -154,6 +154,23 @@ export class CronService {
     return drafted;
   }
 
+  /**
+   * Every 15 minutes: release texts the quiet-hours guard held overnight.
+   * Sends land within a quarter hour of the recipient's 8:00.
+   */
+  @Cron('*/15 * * * *')
+  async flushQuietHoursQueue(): Promise<void> {
+    if (!this.enabled) return;
+    await this.concierge
+      .flushQueuedTexts()
+      .catch((e) => this.log.warn(`quiet-hours flush failed: ${e.message}`));
+  }
+
+  /** Dev-endpoint passthrough: drain the queue regardless of ENABLE_CRON. */
+  async flushQueuedTextsNow(): Promise<number> {
+    return this.concierge.flushQueuedTexts();
+  }
+
   /** Hourly: publish anything now due (belt-and-suspenders with BullMQ). */
   @Cron(CronExpression.EVERY_HOUR)
   async publishDue(): Promise<void> {

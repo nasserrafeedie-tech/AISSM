@@ -39,6 +39,14 @@ export class DevCronController {
     return { ok: true };
   }
 
+  @Post('flush-texts')
+  async flushTexts(): Promise<{ sent: number }> {
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_SMS !== '1') {
+      throw new NotFoundException();
+    }
+    return { sent: await this.cron.flushQueuedTextsNow() };
+  }
+
   @Post('run-week')
   async runWeek(
     @Body() body: unknown,
