@@ -34,9 +34,9 @@ services:
       # Cron heartbeat off until you're ready for autonomous posting.
       - key: ENABLE_CRON
         value: "0"
-      # Keep the AI/publishing in free offline mode until you add keys.
+      # Real Claude captions — key is set in the dashboard (July 2026).
       - key: LLM_FAKE
-        value: "1"
+        value: "0"
       # ── Paste these in the Render dashboard (kept out of git) ──────────
       - key: DATABASE_URL          # Neon Postgres connection string
         sync: false
