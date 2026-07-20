@@ -26,6 +26,12 @@ export default function DevSmsPage() {
     bottom.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thread]);
 
+  // A different number is a different customer — old bubbles would read as
+  // the bot repeating itself, so the thread resets with the number.
+  useEffect(() => {
+    setThread([]);
+  }, [phone]);
+
   async function send(text: string) {
     if (!text.trim() || busy) return;
     setErr('');
