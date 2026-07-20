@@ -168,7 +168,9 @@ export function renderArchetypeSection(a: {
         : (PROSE_FIELDS as readonly string[]).includes(key)
           ? String(value ?? '')
           : asList(value);
-    lines.push(`- **${label}:** ${rendered}.`);
+    // Don't double up when the value already ends in punctuation.
+    const end = /[.!?]$/.test(rendered.trim()) ? '' : '.';
+    lines.push(`- **${label}:** ${rendered}${end}`);
   }
   const date = a.researchedAt.toISOString().slice(0, 10);
   const tag =
