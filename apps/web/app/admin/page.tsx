@@ -70,20 +70,27 @@ export default function AdminPage() {
   const api = process.env.NEXT_PUBLIC_API_URL;
   const [token, setToken] = useState('');
   const [data, setData] = useState<any>(null);
+  const [ready, setReady] = useState<any>(null);
   const [err, setErr] = useState('');
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+  const [showChecks, setShowChecks] = useState(false);
 
   const load = useCallback(
     async (tok: string) => {
       setErr('');
       try {
-        const res = await fetch(`${api}/admin/overview`, {
-          headers: { 'x-admin-token': tok },
-        });
+        const headers = { 'x-admin-token': tok };
+        const res = await fetch(`${api}/admin/overview`, { headers });
         if (!res.ok) throw new Error(String(res.status));
         setData(await res.json());
         setRefreshedAt(new Date());
         sessionStorage.setItem('admin-token', tok);
+        // Readiness is a separate, non-critical call — a failure here should
+        // never cost you the overview.
+        fetch(`${api}/health/launch`, { headers })
+          .then((r) => (r.ok ? r.json() : null))
+          .then(setReady)
+          .catch(() => setReady(null));
       } catch {
         setErr('That token didn’t work — double-check and try again.');
       }
@@ -165,6 +172,74 @@ export default function AdminPage() {
           Refresh{refreshedAt ? ` · ${timeAgo(refreshedAt.toISOString())}` : ''}
         </button>
       </div>
+
+      {/* Launch readiness — is production actually able to serve a customer? */}
+      {ready && (
+        <section
+          className={`mt-8 rounded-2xl border bg-white px-5 py-4 shadow-soft ${
+            ready.go ? 'border-sage/40' : 'border-clay-500/40'
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <Chip tone={ready.go ? 'good' : 'bad'}>
+                {ready.go ? 'Ready to launch' : 'Not ready'}
+              </Chip>
+              <span className="text-sm font-medium">{ready.headline}</span>
+            </div>
+            <button
+              onClick={() => setShowChecks((v) => !v)}
+              className="text-xs text-ink/50 underline underline-offset-2 hover:text-clay-600"
+            >
+              {showChecks ? 'Hide details' : 'Show all checks'}
+            </button>
+          </div>
+
+          {ready.blockers?.length > 0 && !showChecks && (
+            <ul className="mt-3 flex flex-col gap-1.5 text-[13px]">
+              {ready.blockers.map((b: string) => (
+                <li key={b} className="flex gap-2">
+                  <span className="text-clay-600">✗</span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {showChecks && (
+            <div className="mt-4 flex flex-col gap-4">
+              {ready.groups.map((g: any) => (
+                <div key={g.name}>
+                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink/45">
+                    {g.name}
+                  </p>
+                  <ul className="mt-1.5 flex flex-col gap-1.5 text-[13px]">
+                    {g.checks.map((c: any) => (
+                      <li key={c.what} className="flex gap-2">
+                        <span
+                          className={
+                            c.state === 'ready'
+                              ? 'text-sage'
+                              : c.state === 'not_yet'
+                                ? 'text-ink/40'
+                                : 'text-clay-600'
+                          }
+                        >
+                          {c.state === 'ready' ? '✓' : c.state === 'not_yet' ? '·' : '✗'}
+                        </span>
+                        <span>
+                          <strong className="font-medium">{c.what}</strong>
+                          <span className="text-ink/55"> — {c.note}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* The four numbers that matter */}
       <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
