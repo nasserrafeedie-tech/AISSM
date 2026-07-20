@@ -30,7 +30,7 @@ const mono = Space_Mono({
   display: 'swap',
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://aissm-web.vercel.app';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://texthandled.com';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -55,6 +55,9 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
     other: [{ rel: 'icon', url: '/icon-512.png', sizes: '512x512' }],
   },
+  // Self-referencing canonical on every page, resolved against metadataBase —
+  // keeps the old vercel.app URLs from competing with texthandled.com in search.
+  alternates: { canonical: './' },
 };
 
 export default function RootLayout({
