@@ -6,6 +6,15 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--workspace", "apps/web"],
       "port": 3000
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "set -a && source .env && set +a && ENABLE_CRON=0 PORT=3001 ADMIN_TOKEN=devtest node apps/backend/dist/main.js"
+      ],
+      "port": 3001
     }
   ]
 }
