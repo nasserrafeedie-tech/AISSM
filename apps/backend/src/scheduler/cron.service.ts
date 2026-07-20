@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TaskBus } from '../tasks/task-bus.service';
 import { ConciergeService } from '../concierge/concierge.service';
 import { zonedToUtc } from '../common/time';
+import { verticalFor } from '../operator/llm/vertical-playbook';
 
 /** Shape of the PLAN_WEEK Result we care about. */
 type PlanResult = { data?: { slots?: CalendarSlot[] } };
@@ -127,17 +128,24 @@ export class CronService {
         where: { customerId, status: 'requested', prompt: { contains: 'clips' } },
       });
       if (!openVideoAsk) {
+        // The ask is vertical-specific: a salon is asked for the before, the
+        // work, and the mirror reveal — not a generic storefront pan. The
+        // recipe is designed so the cut can't miss.
+        const profile = await this.prisma.brandProfile.findUnique({
+          where: { customerId },
+          select: { businessType: true },
+        });
+        const v = verticalFor(profile?.businessType);
         await this.prisma.shotListRequest.create({
           data: {
             customerId,
-            prompt:
-              'Reel clips: (1) your storefront from the street, (2) you doing the work, (3) a happy customer moment. 5-10 seconds each.',
+            prompt: `Reel clips (${v.key}): (1) ${v.reelClips[0]}, (2) ${v.reelClips[1]}, (3) ${v.reelClips[2]}. 5-10 seconds each.`,
           },
         });
         const site = process.env.PUBLIC_SITE_URL ?? 'https://aissm-web.vercel.app';
         await this.concierge.notify(
           customerId,
-          `One more thing — film me 3 quick clips this week (your storefront, you at work, a happy customer) and I'll cut them into a reel. Upload here: ${site}/upload?c=${customerId}`,
+          `One more thing — film me 3 quick clips this week: (1) ${v.reelClips[0]}, (2) ${v.reelClips[1]}, (3) ${v.reelClips[2]}. 5-10 seconds each, don't overthink it. Upload here: ${site}/upload?c=${customerId}`,
         );
       }
     }

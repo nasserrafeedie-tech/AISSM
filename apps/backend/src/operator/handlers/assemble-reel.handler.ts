@@ -14,6 +14,7 @@ import type { BrandTheme } from '../graphics/slide-templates';
 import { ReelService } from '../video/reel.service';
 import { TaskHandler, ok, fail } from './handler.interface';
 import { StorageService } from '../../common/storage.service';
+import { verticalFor } from '../llm/vertical-playbook';
 
 /**
  * ASSEMBLE_REEL (§7, Growth+). Take the owner's banked clips, cut them into a
@@ -110,7 +111,9 @@ export class AssembleReelHandler implements TaskHandler<'ASSEMBLE_REEL'> {
     try {
       mp4 = await this.reel.assemble({
         clipPaths: clipPaths.map((c) => c.path),
-        hookText: task.payload.hook_text ?? defaultHook(customer.businessName),
+        hookText:
+          task.payload.hook_text ??
+          verticalFor(profile.businessType).reelHook,
         endCardPng,
         accentHex: profile.brandColors?.[1],
         fontPath: bundledFont(),
@@ -197,10 +200,6 @@ export class AssembleReelHandler implements TaskHandler<'ASSEMBLE_REEL'> {
       { post_id: post.id, media_ref: r2Key, clip_count: clipPaths.length, bytes: mp4.length },
     );
   }
-}
-
-function defaultHook(businessName: string | null): string {
-  return businessName ? `A little peek inside ${businessName}` : 'Come behind the counter with us';
 }
 
 /** First bundled bold-ish TTF from the graphics fonts dir (src or dist). */
