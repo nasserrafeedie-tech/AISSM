@@ -487,6 +487,8 @@ export class ConciergeService {
       targetCustomer: string | null;
       offers: string[];
     } | null,
+    /** So a novel business type can be told what the pause is for. */
+    notify?: { phone: string; conversationId: string },
   ): Promise<void> {
     if (!profile?.businessType) return;
 
@@ -506,6 +508,18 @@ export class ConciergeService {
       `no confident archetype for "${profile.businessType}" ` +
         `(best ${verdict.slug ?? 'none'} @ ${verdict.confidence.toFixed(2)}) — researching`,
     );
+    // Real web research takes a few minutes. Say so — otherwise the silence
+    // reads as the product hanging, when it's the most valuable thing it does.
+    if (notify) {
+      await this.reply(
+        notify.phone,
+        notify.conversationId,
+        "One thing — you're the first business like yours I've worked with, " +
+          "so give me about five minutes to go read up on what actually " +
+          "works for your kind of business. I'll text you the second your " +
+          'first week is ready.',
+      ).catch(() => undefined);
+    }
     const researched = await this.research.ensureArchetypeFor(profile.businessType);
     if (researched) {
       await this.playbook.attach(customerId, researched.slug, researched.confidence);
@@ -689,7 +703,7 @@ export class ConciergeService {
     // (engine Flow 1). A novel business type researches its own archetype
     // first — the wait sits between two texts, so the owner reads it as the
     // machine working, and their very first plan is already specialist-grade.
-    await this.assignArchetype(customerId, done).catch((e) =>
+    await this.assignArchetype(customerId, done, { phone, conversationId }).catch((e) =>
       this.log.warn(`archetype assignment failed for ${customerId}: ${String(e)}`),
     );
 

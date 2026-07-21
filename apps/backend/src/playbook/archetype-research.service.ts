@@ -193,7 +193,9 @@ export class ArchetypeResearchService {
       '- Respect trade-specific compliance in mistakes (patient privacy for',
       '  health, consent for before/afters, licensing claims for contractors,',
       '  no medical claims for wellness, child-photo rules for childcare).',
-      'End your reply with the JSON object and nothing after it.',
+      'Keep any prose before the JSON to two sentences at most — you are',
+      'being read by a program, not a person. End your reply with the JSON',
+      'object and nothing after it.',
     ].join('\n');
 
     const prompt = [
@@ -215,7 +217,7 @@ export class ArchetypeResearchService {
         model: process.env.LLM_MODEL_VOICE ?? 'claude-sonnet-5',
         system,
         prompt,
-        maxTokens: 4000,
+        maxTokens: 8000,
         maxSearches: MAX_SEARCHES_PER_PASS,
       });
       const draft = Draft.parse(JSON.parse(extractJsonObject(text)));
@@ -229,8 +231,16 @@ export class ArchetypeResearchService {
       );
     }
 
+    // No tools on this path — strip the search instruction, or the model
+    // stalls waiting for a capability it hasn't been given.
+    const offlineSystem = system
+      .replace(
+        /Search the web before answering[\s\S]*?trade\./,
+        'Draw on what you know about this trade.',
+      )
+      .replace('- Cite what you find. Never invent statistics.', '- Never invent statistics.');
     const draft = await this.llm.completeJson(
-      { tier: 'voice', cachedContext: system, prompt, maxTokens: 2000 },
+      { tier: 'voice', cachedContext: offlineSystem, prompt, maxTokens: 3000 },
       Draft,
     );
     return { draft, sources: [], searches: 0 };

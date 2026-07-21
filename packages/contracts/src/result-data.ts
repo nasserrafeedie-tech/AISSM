@@ -10,12 +10,27 @@ import { Platform, PostArchetype } from './enums';
 const iso8601 = z.string().datetime({ offset: true });
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 
+/**
+ * Models write enums the way a person would — "Instagram", "Behind The
+ * Scenes" — and a strict enum rejects the whole week's plan over the capital
+ * letter. Normalize to the canonical form before validating; what we STORE
+ * stays exactly the enum, so nothing downstream has to be case-aware.
+ */
+const lenientEnum = <T extends readonly [string, ...string[]]>(e: z.ZodEnum<T>) =>
+  z.preprocess(
+    (v) =>
+      typeof v === 'string'
+        ? v.trim().toLowerCase().replace(/[\s-]+/g, '_')
+        : v,
+    e,
+  );
+
 /** One slot in a planned week (PLAN_WEEK result + the LLM planning output). */
 export const CalendarSlot = z
   .object({
     date: isoDate,
-    archetype: PostArchetype,
-    platform: Platform,
+    archetype: lenientEnum(PostArchetype),
+    platform: lenientEnum(Platform),
     best_time: z.string().regex(/^\d{2}:\d{2}$/, 'HH:MM'),
     needs_asset: z.boolean(),
     // Models often return a shot LIST as an actual list — accept both shapes

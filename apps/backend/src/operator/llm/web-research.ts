@@ -203,6 +203,11 @@ export async function researchWithSearch(
     allBlocks.push(...blocks);
     searches += data.usage?.server_tool_use?.web_search_requests ?? 0;
 
+    if (data.stop_reason === 'max_tokens') {
+      throw new Error(
+        'research response hit max_tokens before finishing its JSON — raise maxTokens or shorten the prompt',
+      );
+    }
     if (data.stop_reason !== 'pause_turn') break;
 
     // Echo the assistant turn back untouched to resume the search.

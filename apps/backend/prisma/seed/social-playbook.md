@@ -249,6 +249,22 @@ trends off-brand · ignoring GBP and reviews · measuring followers not actions.
 - **Revenue metric:** appointment-request calls/forms, GBP actions, new reviews, new-patient inquiries.
 - **Researched:** 2026-07-20 (seed).
 
+### ARCHETYPE: Nostalgia Arcade & Barcade
+- **Maps from:** barcade, arcade bar, retro arcade, vintage arcade bar, classic game bar, pinball bar, adult arcade, game bar, 80s arcade bar.
+- **Platforms:** Instagram; TikTok; Facebook; Google Business Profile.
+- **Content pillars:** Gameplay & high-score moments; Tournament & league nights; Nostalgia & retro aesthetic; Drink + game pairings; Community leaderboard culture; Behind-the-scenes cabinet maintenance.
+- **Top formats:** Short vertical video of a comeback win or high-score moment; Split-screen reaction shots during tournament finals; Carousel of cabinet close-ups (marquee art, joystick, CRT glow); Weekly leaderboard graphic posted to Stories; Time-lapse of a packed Friday night floor.
+- **Cadence:** 4-7 posts per week across Instagram/TikTok for peak relevance; Daily Stories during open hours (leaderboard, drink special, seat count); 1 Google Business Profile photo or post per week minimum; Facebook event created for every tournament or themed night at least 5 days out.
+- **Reels that work:** Coin drops, screen lights up, first frame is the marquee flashing; Slow-mo of the flipper save right before a pinball drains — payoff is the 'saved it' reaction; Countdown timer overlay on a Street Fighter or Mortal Kombat match, ending on the finishing blow; Bartender pours a themed cocktail next to a cabinet lit in matching neon, first second is the pour; Claw machine grab in extreme close-up, cut the instant the prize drops.
+- **Photo style:** Warm neon-and-CRT-glow lighting with the cabinet artwork, marquee, or scoreboard sharply in frame so the retro aesthetic reads instantly even as a thumbnail.
+- **Caption hooks:** "New high score just dropped and nobody's ready for it"; "POV: you said 'one more game' three hours ago"; "Tournament bracket is live — who's taking the crown tonight?"; "This cabinet is older than half our regulars"; "Barcade? Sure, we'll drink to that".
+- **Local discovery:** Optimize Google Business Profile description and posts for phrases like 'arcade bar near me,' 'barcade [city],' and 'retro games and drinks'; Geotag every photo and Reel with the exact venue location, not just the city; Upload new Google Business Profile photos weekly — cabinets, drinks, event nights, even the room itself; Use community/location tags on Instagram and Facebook for local nightlife and gaming groups; Encourage check-ins and tag drops from tournament participants to widen local reach; Respond to every Google review, mentioning specific games or nights by name for SEO relevance.
+- **Offers that convert:** Unlimited-play hourly or all-night wristband deals; Happy hour combining discounted drinks with free-play tokens; Loyalty punch card offering a discount after 5-10 visits; Private party packages for birthdays and corporate team nights; Weekly tournament entry with a bar-tab prize for the winner.
+- **Seasonal hooks:** Retro Halloween costume tournament tied to a classic game theme; Holiday-lights-meets-arcade neon photo nights in December; Summer bracket league culminating in a finals night; Anniversary or 'throwback decade' week featuring the bar's original opening-year games; Back-to-school college night with student discount on wristbands.
+- **Mistakes:** Posting blurry, dim phone photos instead of well-lit cabinet and drink shots; Never mentioning tournaments or leaderboards by name, missing free local SEO keywords; Ignoring Google Business Profile for weeks — stale photos and no posts hurt local ranking; Filming patrons closely or posting faces without visible consent, especially near ID-check areas or during private parties; Making unverified claims about prize values or 'guaranteed win' odds on claw machines or redemption games.
+- **Revenue metric:** Tournament-night and wristband-redemption revenue tracked against social post reach and Google Business Profile 'directions' clicks for that event week.
+- **Researched:** 2026-07-21 (researched, confidence 0.78).
+
 ### ARCHETYPE: Pet services
 - **Maps from:** groomer, dog daycare/boarding, dog walker, trainer, pet sitter, pet boutique.
 - **Platforms:** Instagram + TikTok (pets = viral gold); Facebook (local pet-parent groups); GBP.
