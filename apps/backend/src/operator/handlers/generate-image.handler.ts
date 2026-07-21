@@ -95,6 +95,7 @@ export class GenerateImageHandler implements TaskHandler<'GENERATE_IMAGE'> {
           cachedContext: '',
           prompt: subjectInstruction(brief),
           maxTokens: 120,
+          customerId: task.customer_id,
         },
         SubjectOutput,
       );

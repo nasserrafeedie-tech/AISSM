@@ -3,6 +3,7 @@ import { PlaybookModule } from '../playbook/playbook.module';
 import { ConciergeController } from './concierge.controller';
 import { DevSmsController } from './dev-sms.controller';
 import { ConciergeService } from './concierge.service';
+import { RecapService } from './recap.service';
 import { TwilioService } from './twilio.service';
 import { OnboardingService } from './onboarding.service';
 import { IntentService } from './intent.service';
@@ -15,11 +16,12 @@ import { LlmService } from '../operator/llm/llm.service';
   // Concierge decoupled from OperatorModule (§3 hard separation).
   providers: [
     ConciergeService,
+    RecapService,
     TwilioService,
     OnboardingService,
     IntentService,
     LlmService,
   ],
-  exports: [ConciergeService, TwilioService],
+  exports: [ConciergeService, TwilioService, RecapService],
 })
 export class ConciergeModule {}

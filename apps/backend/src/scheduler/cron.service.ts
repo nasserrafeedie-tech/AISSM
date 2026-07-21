@@ -9,6 +9,7 @@ import { ConciergeService } from '../concierge/concierge.service';
 import { ArchetypeResearchService } from '../playbook/archetype-research.service';
 import { ReauthService } from '../connect/reauth.service';
 import { ReconcileService } from './reconcile.service';
+import { RecapService } from '../concierge/recap.service';
 import { ArchetypePerformanceService } from '../playbook/archetype-performance.service';
 import { zonedToUtc } from '../common/time';
 import { resolveStrategy } from '../operator/llm/vertical-playbook';
@@ -39,6 +40,7 @@ export class CronService {
     private readonly reauth: ReauthService,
     private readonly reconcile: ReconcileService,
     private readonly performance: ArchetypePerformanceService,
+    private readonly recap: RecapService,
   ) {}
 
   private get enabled(): boolean {
@@ -320,6 +322,24 @@ export class CronService {
     await this.performance
       .recompute()
       .catch((e) => this.log.warn(`Flow 4 recompute failed: ${e.message}`));
+  }
+
+  /**
+   * Daily (10:00): the month-in-review text, to everyone whose renewal is a
+   * few days out. This category churns at ~46% a year and the difference is
+   * whether the owner can see what they are paying for — see RecapService.
+   */
+  @Cron('0 10 * * *')
+  async sendRecaps(): Promise<void> {
+    if (!this.enabled) return;
+    await this.recap
+      .sweep()
+      .catch((e) => this.log.warn(`recap sweep failed: ${e.message}`));
+  }
+
+  /** Dev-endpoint passthrough: run the recap sweep regardless of ENABLE_CRON. */
+  async sendRecapsNow(): Promise<{ sent: number; skipped: number }> {
+    return this.recap.sweep();
   }
 
   /** Dev-endpoint passthrough: rebuild Flow 4 regardless of ENABLE_CRON. */

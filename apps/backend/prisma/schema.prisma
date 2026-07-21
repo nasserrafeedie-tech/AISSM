@@ -122,6 +122,10 @@ model Customer {
   // to make. See OWNER_CONSENT_COPY in graphics/image-prompt.ts.
   aiImagesOptIn   Boolean        @default(false)
   aiImagesOptInAt DateTime?
+  // When the last monthly results recap went out. Guards against sending twice
+  // in a billing cycle — the sweep runs daily and the send window is several
+  // days wide, so without this an owner would get the same recap every day.
+  lastRecapAt     DateTime?
   trustLevel      TrustLevel     @default(approve_all) // §8: everyone starts here
   status          CustomerStatus @default(onboarding)
   stripeCustomerId String?       @unique
@@ -187,6 +191,35 @@ model PlaybookArchetype {
 
   @@index([status])
   @@map("playbook_archetypes")
+}
+
+// ─── llm_usage (what each customer actually costs to serve) ──────────────
+// Margin is ~90% on the assumption that model calls are cheap. That assumption
+// has never been measured: a chatty owner who revises every draft costs many
+// times what a quiet one does, and nothing recorded the difference.
+//
+// Token counts are stored rather than dollars. Counts are facts that do not
+// change; a price does, and a rate correction should never require rewriting
+// history. Cost is derived at read time — see llm/pricing.ts.
+model LlmUsage {
+  id           String   @id @default(uuid()) @db.Uuid
+  // Null for work not tied to one customer (playbook research, for instance,
+  // which is paid once and reused by everyone in that trade).
+  customerId   String?  @db.Uuid
+  model        String
+  tier         String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  // Cached input is billed differently from fresh input — reads are a fraction
+  // of the price, writes a premium. Kept apart so the saving from prompt
+  // caching is visible rather than blended away.
+  cacheReadTokens  Int  @default(0)
+  cacheWriteTokens Int  @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([createdAt])
+  @@map("llm_usage")
 }
 
 // ─── archetype_performance (Flow 4: what actually worked) ────────────────

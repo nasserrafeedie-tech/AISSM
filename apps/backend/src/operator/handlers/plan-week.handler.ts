@@ -81,7 +81,7 @@ export class PlanWeekHandler implements TaskHandler<'PLAN_WEEK'> {
     ].join(' ');
 
     const planned = await this.llm.completeJson(
-      { tier: 'voice', cachedContext: context, prompt, maxTokens: 1500 },
+      { tier: 'voice', cachedContext: context, prompt, maxTokens: 1500, customerId: task.customer_id },
       PlanWeekLlmOutput,
     );
 

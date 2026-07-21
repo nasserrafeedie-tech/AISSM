@@ -66,6 +66,13 @@ function timeAgo(d: string): string {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
+const CHURN_NOTE: Record<string, string> = {
+  'no data': 'not enough customers yet to mean anything',
+  healthy: 'healthy — keep doing what you are doing',
+  watch: 'normal, but worth watching',
+  fire: 'too high — this needs fixing before anything else',
+};
+
 export default function AdminPage() {
   const api = process.env.NEXT_PUBLIC_API_URL;
   const [token, setToken] = useState('');
@@ -272,6 +279,101 @@ export default function AdminPage() {
           </div>
         ))}
       </div>
+
+      {/* The health of the business itself — churn first, because this
+          category loses ~46% of customers a year and nothing else matters
+          if that number is bad. */}
+      {data.business && (
+        <section className="mt-10">
+          <h2 className="mb-1 font-display text-xl font-medium">
+            Is the business healthy?
+          </h2>
+          <p className="mb-4 text-[13px] text-ink/55">
+            Services like this normally lose about 46% of their customers a
+            year. Keeping that number down matters more than anything else on
+            this page.
+          </p>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div
+              className={`rounded-2xl border bg-white px-5 py-4 shadow-soft ${
+                data.business.churn.verdict === 'fire'
+                  ? 'border-clay-500/50'
+                  : 'border-ink/10'
+              }`}
+            >
+              <span className="block font-mono text-[11px] uppercase tracking-[0.16em] text-ink/45">
+                People leaving
+              </span>
+              <span
+                className={`mt-1 block font-display text-3xl font-bold ${
+                  data.business.churn.verdict === 'fire' ? 'text-clay-600' : ''
+                }`}
+              >
+                {data.business.churn.monthlyRatePct === null
+                  ? '—'
+                  : `${data.business.churn.monthlyRatePct.toFixed(1)}%`}
+              </span>
+              <span className="text-[13px] text-ink/60">
+                {CHURN_NOTE[data.business.churn.verdict]}
+              </span>
+              {data.business.churn.lost30d > 0 && (
+                <span className="mt-1 block text-[12px] text-ink/45">
+                  {data.business.churn.lost30d} cancelled in the last 30 days
+                </span>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-ink/10 bg-white px-5 py-4 shadow-soft">
+              <span className="block font-mono text-[11px] uppercase tracking-[0.16em] text-ink/45">
+                Money coming in
+              </span>
+              <span className="mt-1 block font-display text-3xl font-bold">
+                ${data.business.revenue.mrrUsd.toLocaleString()}
+              </span>
+              <span className="text-[13px] text-ink/60">every month</span>
+              {data.business.revenue.byTier.length > 0 && (
+                <span className="mt-1 block text-[12px] text-ink/45">
+                  {data.business.revenue.byTier
+                    .map((t: any) => `${t.customers} on ${t.tier}`)
+                    .join(' · ')}
+                </span>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-ink/10 bg-white px-5 py-4 shadow-soft">
+              <span className="block font-mono text-[11px] uppercase tracking-[0.16em] text-ink/45">
+                What the AI costs
+              </span>
+              <span className="mt-1 block font-display text-3xl font-bold">
+                {data.business.cost.last30dLabel}
+              </span>
+              <span className="text-[13px] text-ink/60">
+                last 30 days
+                {data.business.cost.pctOfMrr !== null &&
+                  ` — ${data.business.cost.pctOfMrr.toFixed(1)}% of revenue`}
+              </span>
+            </div>
+          </div>
+
+          {data.business.cost.perCustomer.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-ink/10 bg-white px-5 py-4 shadow-soft">
+              <p className="mb-2 text-[13px] text-ink/60">
+                Most expensive customers to serve — worth a look if one is far
+                above the rest.
+              </p>
+              <ul className="flex flex-col gap-1">
+                {data.business.cost.perCustomer.slice(0, 5).map((c: any) => (
+                  <li key={c.customerId} className="flex justify-between text-[14px]">
+                    <span>{c.businessName ?? c.customerId.slice(0, 8)}</span>
+                    <span className="font-mono text-ink/70">{c.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Needs attention */}
       <section className="mt-10">

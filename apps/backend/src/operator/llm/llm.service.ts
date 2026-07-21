@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { parseLlmJson, LlmJsonError } from '@smm/contracts';
+import { PrismaService } from '../../prisma/prisma.service';
 
 export type LlmTier = 'bulk' | 'voice';
 
@@ -13,6 +14,12 @@ export interface LlmJsonRequest {
   /** The variable instruction for this specific call. */
   prompt: string;
   maxTokens?: number;
+  /**
+   * Who this call is for, so its cost can be attributed. Optional: some work
+   * (playbook research) is paid once and reused by every business in that
+   * trade, and charging it to whoever happened to trigger it would be wrong.
+   */
+  customerId?: string;
 }
 
 /**
@@ -27,6 +34,8 @@ export interface LlmJsonRequest {
 @Injectable()
 export class LlmService {
   private readonly log = new Logger(LlmService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
 
   private model(tier: LlmTier): string {
     return tier === 'voice'
@@ -109,7 +118,17 @@ export class LlmService {
 
     const data = (await res.json()) as {
       content?: Array<{ type: string; text?: string }>;
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_read_input_tokens?: number;
+        cache_creation_input_tokens?: number;
+      };
     };
+
+    // Every response reports exactly what it consumed. Recording it is the
+    // difference between believing the margin is ~90% and knowing it.
+    await this.recordUsage(req, data.usage);
     const text = (data.content ?? [])
       .filter((b) => b.type === 'text' && typeof b.text === 'string')
       .map((b) => b.text as string)
@@ -119,6 +138,39 @@ export class LlmService {
       throw new Error('Anthropic API returned no text content');
     }
     return text;
+  }
+
+  /**
+   * Store what a call consumed. Never allowed to break the call it measures:
+   * a failure to write a usage row must not cost an owner their post.
+   */
+  private async recordUsage(
+    req: LlmJsonRequest,
+    usage:
+      | {
+          input_tokens?: number;
+          output_tokens?: number;
+          cache_read_input_tokens?: number;
+          cache_creation_input_tokens?: number;
+        }
+      | undefined,
+  ): Promise<void> {
+    if (!usage) return;
+    try {
+      await this.prisma.llmUsage.create({
+        data: {
+          customerId: req.customerId ?? null,
+          model: this.model(req.tier),
+          tier: req.tier,
+          inputTokens: usage.input_tokens ?? 0,
+          outputTokens: usage.output_tokens ?? 0,
+          cacheReadTokens: usage.cache_read_input_tokens ?? 0,
+          cacheWriteTokens: usage.cache_creation_input_tokens ?? 0,
+        },
+      });
+    } catch (e) {
+      this.log.warn(`could not record LLM usage: ${String(e)}`);
+    }
   }
 
   /**

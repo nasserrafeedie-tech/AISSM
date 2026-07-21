@@ -98,7 +98,7 @@ export class DraftPostHandler implements TaskHandler<'DRAFT_POST'> {
       .join('\n');
 
     const gen = await this.llm.completeJson(
-      { tier: 'bulk', cachedContext: context, prompt, maxTokens: 600 },
+      { tier: 'bulk', cachedContext: context, prompt, maxTokens: 600, customerId: task.customer_id },
       CaptionLlmOutput,
     );
 
@@ -124,6 +124,7 @@ export class DraftPostHandler implements TaskHandler<'DRAFT_POST'> {
             cachedContext: context,
             prompt: `${prompt}\n\n${slopFeedback(findings, gen.caption)}`,
             maxTokens: 600,
+            customerId: task.customer_id,
           },
           CaptionLlmOutput,
         );

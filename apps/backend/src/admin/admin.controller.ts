@@ -1,5 +1,6 @@
 import { Controller, Get, Headers, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BusinessMetricsService } from './business-metrics.service';
 
 /**
  * Operator's eyes — NOT a customer dashboard (§2: customers never get one).
@@ -9,7 +10,10 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly metrics: BusinessMetricsService,
+  ) {}
 
   @Get('overview')
   async overview(@Headers('x-admin-token') token: string | undefined) {
@@ -50,6 +54,7 @@ export class AdminController {
     ]);
 
     return {
+      business: await this.metrics.build(),
       counts: {
         leads: await this.prisma.lead.count(),
         customers: await this.prisma.customer.count(),
