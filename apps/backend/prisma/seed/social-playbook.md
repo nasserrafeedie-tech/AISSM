@@ -169,6 +169,22 @@ trends off-brand · ignoring GBP and reviews · measuring followers not actions.
 - **Revenue metric:** link/DM sale requests, "hold" DMs, direction taps, story-swipe clicks.
 - **Researched:** 2026-07-20 (seed).
 
+### ARCHETYPE: Brewery / Taproom & Craft Beverage Producer
+- **Maps from:** brewery, taproom, craft brewery, brewpub, beer garden, microbrewery, cidery, meadery.
+- **Platforms:** Instagram; TikTok; Facebook; Google Business Profile.
+- **Content pillars:** New release drops and can/tap art reveals; Taproom atmosphere and live music/events; Behind-the-scenes brewing process; Staff and regulars personality content; Food truck, trivia, and recurring weekly programming.
+- **Top formats:** Short-form vertical video (Reels/TikTok) of pours and releases; Story polls voting on next seasonal flavor; Carousel posts of can art or tasting flight lineups; Facebook event pages for trivia, live music, and release parties; Live video taproom tours or tap takeovers.
+- **Cadence:** 3-4 feed/video posts per week across Instagram and TikTok; Daily Instagram/Facebook Story whenever taps change or the room fills up; Weekly Facebook event post for the recurring trivia/music night; Google Business Profile update at least weekly with new beer, event, or hours change.
+- **Reels that work:** First pour of a brand-new can straight off the line, foam settling; Tapping a fresh keg with the handle going in and beer hitting the glass; Bartender sliding a flight of 4 across the bar to camera; Grain or hops dumping into the mash tun in one satisfying pour; Packed taproom pan across the crowd on trivia or live-music night.
+- **Photo style:** Warm, slightly moody taproom light with condensation-beaded glasses and can labels held at an angle that catches the artwork, shot close enough to read the beer name.
+- **Caption hooks:** "New tap just kicked in and it's already going fast."; "This one's been fermenting for six weeks — worth the wait."; "Trivia starts at 7, first pitcher's on us for the winning team."; "We only made 200 cans of this one."; "Ask your bartender what's freshest — it changed an hour ago.".
+- **Local discovery:** Optimize Google Business Profile categories, hours, amenities and photos so the listing surfaces for hyper-specific local queries; Geotag every post with the taproom's exact location, not just the city; Use event schema/GBP posts so trivia nights and tap takeovers show up directly in search; Encourage and respond to every Google/Yelp review to keep the profile signaling as active; Tag the neighborhood or district community page/hashtag, not just #craftbeer.
+- **Offers that convert:** First pour free for trivia-night winning team; Mug club or growler-fill loyalty punch card; Happy hour flight discount posted as a Story countdown; Free can koozie or sticker with first-time check-in; Local food-truck night combo deal cross-promoted with the truck's own page.
+- **Seasonal hooks:** Oktoberfest/fall lager release week; Summer patio and beer-garden reopening push; Holiday variety pack and gift-card push in December; Spring seasonal IPA or sour drop tied to warmer patio weather; Anniversary or founding-date brewery birthday party.
+- **Mistakes:** Posting the same beer photo angle every release instead of showing the pour or the room; Ignoring Facebook events, which is where regulars actually check trivia/live-music schedules; Letting the Google Business Profile hours or tap list go stale after a schedule change; Never repurposing customer-tagged photos and check-ins as UGC; Making implied health or low-calorie claims about beer without regulatory backing.
+- **Revenue metric:** Taproom foot traffic and growler/mug-club membership renewals on nights promoted through Stories, trivia events, and GBP posts versus un-promoted nights.
+- **Researched:** 2026-07-21 (researched, confidence 0.78).
+
 ### ARCHETYPE: Cafés & coffee shops
 - **Maps from:** coffee shop, espresso bar, matcha bar, tea house, juice bar, bubble tea.
 - **Platforms:** Instagram (primary); TikTok; GBP. (Food & bev over-indexes on IG/TikTok engagement — Rival IQ.).
