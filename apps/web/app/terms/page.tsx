@@ -60,10 +60,11 @@ export default function TermsPage() {
           In standard mode, nothing is published until you approve it — replying
           &ldquo;yes&rdquo; to a draft confirms the content is accurate and
           approves publication, so check prices, dates, and offers. If you
-          enable AUTOPILOT, you authorize Handled to publish low-risk content
-          without individual approval; anything involving prices, percentages,
-          dates, or promotions still always requires your explicit approval.
-          Text MANUAL at any time to return to approve-everything mode.
+          ask us to post without checking each time (&ldquo;autopilot&rdquo;),
+          you authorize Handled to publish low-risk content without individual
+          approval; anything involving prices, percentages, dates, or
+          promotions still always requires your explicit approval. Tell us any
+          time that you want to approve posts again, and we will.
         </p>
       </section>
 

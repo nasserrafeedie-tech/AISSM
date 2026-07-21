@@ -356,6 +356,12 @@ model Metric {
 model Conversation {
   id         String   @id @default(uuid()) @db.Uuid
   customerId String   @unique @db.Uuid
+  // Handled interprets what owners say instead of making them memorize
+  // keywords, so a consequential or unclear reading gets confirmed first.
+  // These hold the pending question: what we think they asked for, and when.
+  // Stale ones are ignored — a "yes" an hour later isn't answering this.
+  pendingIntent   String?
+  pendingIntentAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

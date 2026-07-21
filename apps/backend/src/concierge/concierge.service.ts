@@ -6,7 +6,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TaskBus } from '../tasks/task-bus.service';
 import { TwilioService } from './twilio.service';
 import { OnboardingService } from './onboarding.service';
-import { IntentService } from './intent.service';
+import {
+  IntentService,
+  CONFIRM_BELOW,
+  CONSEQUENTIAL,
+  type OwnerIntent,
+} from './intent.service';
 import { LlmService } from '../operator/llm/llm.service';
 import { PlaybookService } from '../playbook/playbook.service';
 import {
@@ -22,6 +27,34 @@ import {
 } from '../common/time';
 import { z } from 'zod';
 import { strategySummary } from './strategy-summary';
+
+/**
+ * Intents that DO something, as opposed to being answered. Only these are
+ * ever gated behind a confirmation — asking "what's my plan?" should never
+ * cost a round trip.
+ */
+const ACTIONABLE: ReadonlySet<OwnerIntent> = new Set([
+  'autopilot_on',
+  'autopilot_off',
+  'start_over',
+]);
+
+/**
+ * What we say when we want to check first. Each states plainly what will
+ * happen, so a "yes" is genuinely informed.
+ */
+const CONFIRMATIONS: Record<string, string> = {
+  autopilot_on:
+    "Just so I've got you right — want me to start posting the routine stuff " +
+    'without checking first? Anything with a price, discount or date still ' +
+    'comes to you. Say yes and I\'ll switch it on.',
+  autopilot_off:
+    'Want me to go back to running every post by you before it goes out?',
+  start_over:
+    'Want me to rebuild your profile from scratch? That clears what I know ' +
+    "about your business and we'd redo the questions — anything already " +
+    'scheduled stays put. Say yes and we start fresh.',
+};
 
 /** Shape of a grounded question-answer from the LLM. */
 const AnswerOutput = z.object({ reply: z.string().min(1).max(600) });
@@ -79,100 +112,15 @@ export class ConciergeService {
       return this.reply(customer.phone, conversation.id, result.summary_for_owner);
     }
 
-    // 1b. Plan keywords — deterministic, stateless, and advertised in our own
-    //     texts, so they must work even though they look like steady-state chat.
-    const kw = msg.body.trim().toLowerCase();
-    if (kw === 'upgrade') {
-      const site = process.env.PUBLIC_SITE_URL ?? 'https://texthandled.com';
+    // 1b. HELP — carrier-mandated, like STOP. Must be exact and must not go
+    //     through interpretation.
+    if (/^\s*help\s*[!.]?\s*$/i.test(msg.body)) {
       return this.reply(
         customer.phone,
         conversation.id,
-        `Happy to bump you up! Growth adds reels cut from your own clips, more posts, and more platforms — upgrade here: ${site}/billing`,
-      );
-    }
-    if (kw === 'refer') {
-      let code = customer.referralCode;
-      if (!code) {
-        code = customer.id.replace(/-/g, '').slice(0, 6).toUpperCase();
-        await this.prisma.customer.update({
-          where: { id: customer.id },
-          data: { referralCode: code },
-        });
-      }
-      const site = process.env.PUBLIC_SITE_URL ?? 'https://texthandled.com';
-      return this.reply(
-        customer.phone,
-        conversation.id,
-        `Know another owner who'd love this? Send them your link — when they join, you BOTH get a month free: ${site}/billing?ref=${code}`,
-      );
-    }
-    if (kw === 'autopilot') {
-      await this.prisma.customer.update({
-        where: { id: customer.id },
-        data: { trustLevel: 'auto_low_risk' },
-      });
-      return this.reply(
-        customer.phone,
-        conversation.id,
-        "Autopilot is on ✳ I'll post the routine stuff on schedule and only text you about promos, discounts, or anything sensitive. Reply MANUAL any time to go back to approving everything.",
-      );
-    }
-    if (kw === 'manual') {
-      await this.prisma.customer.update({
-        where: { id: customer.id },
-        data: { trustLevel: 'approve_all' },
-      });
-      return this.reply(
-        customer.phone,
-        conversation.id,
-        "Done — back to how it was: nothing goes out without your OK.",
-      );
-    }
-    // PLAN / STRATEGY: show the owner what they're paying for. Handled has no
-    // dashboard by design, but "no dashboard" shouldn't mean "no visibility" —
-    // so the plan is legible over the same channel as everything else.
-    if (kw === 'plan' || kw === 'strategy') {
-      return this.reply(
-        customer.phone,
-        conversation.id,
-        await this.buildStrategySummary(customer.id),
-      );
-    }
-
-    // RESET: wipe the brand profile and redo the interview from the top.
-    // Scheduled posts stay put; only the profile (and its strategy) resets.
-    if (kw === 'reset') {
-      await this.prisma.brandProfile.updateMany({
-        where: { customerId: customer.id },
-        data: {
-          businessType: null,
-          voiceTone: null,
-          targetCustomer: null,
-          offers: [],
-          dosAndDonts: [],
-          postingFrequency: null,
-          brandColors: [],
-          visualStyle: null,
-          contentStrategy: Prisma.DbNull,
-          onboardingComplete: false,
-        },
-      });
-      await this.prisma.customer.update({
-        where: { id: customer.id },
-        data: { status: 'onboarding', businessName: null },
-      });
-      return this.reply(
-        customer.phone,
-        conversation.id,
-        `Fresh start ✳ Let's redo your profile from the top. ${this.onboarding.question('business_type')}`,
-      );
-    }
-    // "can we restart" / "start over" — don't guess; confirm with the keyword.
-    if (/\b(restart|start over|redo (my |the )?(profile|setup|onboarding)|from scratch)\b/i.test(msg.body)) {
-      return this.reply(
-        customer.phone,
-        conversation.id,
-        'Want me to rebuild your profile from scratch? Reply RESET and we start over — anything already scheduled stays put.',
+        "Handled runs your social media over text. Just tell me what you need in " +
+          "your own words — see your plan, change a post, post more often, pause. " +
+          "Reply STOP to cancel any time. Msg & data rates may apply.",
       );
     }
 
@@ -247,7 +195,111 @@ export class ConciergeService {
       orderBy: { createdAt: 'asc' },
     });
 
-    const { intent, feedback } = await this.intent.classify(body, Boolean(pending));
+    let { intent, feedback, confidence } = await this.intent.classify(
+      body,
+      Boolean(pending),
+    );
+
+    // Are they answering a question we asked? A plain "yes" means the thing
+    // we last proposed, not the draft — so this is resolved before anything
+    // else looks at the intent.
+    const awaiting = await this.pendingConfirmation(conversationId);
+    let justConfirmed = false;
+    if (awaiting) {
+      await this.clearPendingConfirmation(conversationId);
+      const affirmative = intent === 'approve';
+      if (affirmative) {
+        intent = awaiting;
+        confidence = 1; // they just told us in as many words
+        justConfirmed = true;
+      } else if (intent === 'other' || intent === 'question') {
+        return this.reply(
+          phone,
+          conversationId,
+          "No problem — I've left everything as it is. What would you like to do?",
+        );
+      }
+      // Anything else (a fresh, clear request) falls through and is honoured.
+    }
+
+    // Interpretation is less certain than a keyword, so ask when the reading
+    // is shaky — or when the action changes what the world sees either way.
+    // `justConfirmed` matters: without it a consequential intent would be
+    // re-confirmed on the very answer that confirmed it, forever.
+    const needsConfirmation =
+      !justConfirmed &&
+      ACTIONABLE.has(intent) &&
+      (CONSEQUENTIAL.has(intent) || confidence < CONFIRM_BELOW);
+    if (needsConfirmation) {
+      await this.setPendingConfirmation(conversationId, intent);
+      return this.reply(phone, conversationId, CONFIRMATIONS[intent]);
+    }
+
+    // Account-level intents. None of these touch the draft queue.
+    switch (intent) {
+      case 'see_plan':
+        return this.reply(
+          phone,
+          conversationId,
+          await this.buildStrategySummary(customerId),
+        );
+
+      case 'upgrade': {
+        const site = process.env.PUBLIC_SITE_URL ?? 'https://texthandled.com';
+        return this.reply(
+          phone,
+          conversationId,
+          `Happy to bump you up! Growth adds reels cut from your own clips, more posts, and more platforms — upgrade here: ${site}/billing`,
+        );
+      }
+
+      case 'refer': {
+        const customer = await this.prisma.customer.findUnique({
+          where: { id: customerId },
+        });
+        let code = customer?.referralCode;
+        if (!code) {
+          code = customerId.replace(/-/g, '').slice(0, 6).toUpperCase();
+          await this.prisma.customer.update({
+            where: { id: customerId },
+            data: { referralCode: code },
+          });
+        }
+        const site = process.env.PUBLIC_SITE_URL ?? 'https://texthandled.com';
+        return this.reply(
+          phone,
+          conversationId,
+          `Know another owner who'd love this? Send them your link — when they join, you BOTH get a month free: ${site}/billing?ref=${code}`,
+        );
+      }
+
+      case 'autopilot_on':
+        await this.prisma.customer.update({
+          where: { id: customerId },
+          data: { trustLevel: 'auto_low_risk' },
+        });
+        return this.reply(
+          phone,
+          conversationId,
+          "Done — I'll post the routine stuff on schedule and only check with " +
+            'you on promos, discounts, or anything sensitive. Just say the ' +
+            'word any time you want to go back to approving everything.',
+        );
+
+      case 'autopilot_off':
+        await this.prisma.customer.update({
+          where: { id: customerId },
+          data: { trustLevel: 'approve_all' },
+        });
+        return this.reply(
+          phone,
+          conversationId,
+          "Done — back to how it was: nothing goes out without your OK.",
+        );
+
+      case 'start_over':
+        return this.startOver(customerId, phone, conversationId);
+    }
 
     // Nothing waiting on them — don't pretend we changed something.
     if (!pending && (intent === 'approve' || intent === 'revise' || intent === 'cancel')) {
@@ -585,6 +637,84 @@ export class ConciergeService {
   }
 
   /**
+   * How long a "did you mean…?" stays open. Long enough to answer between
+   * customers, short enough that tomorrow's "yeah" isn't read as agreeing to
+   * something they've forgotten about.
+   */
+  private static readonly CONFIRMATION_TTL_MS = 30 * 60 * 1000;
+
+  /** The intent we're waiting on a yes/no for, if it hasn't gone stale. */
+  private async pendingConfirmation(
+    conversationId: string,
+  ): Promise<OwnerIntent | null> {
+    const convo = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { pendingIntent: true, pendingIntentAt: true },
+    });
+    if (!convo?.pendingIntent || !convo.pendingIntentAt) return null;
+    const age = Date.now() - convo.pendingIntentAt.getTime();
+    if (age > ConciergeService.CONFIRMATION_TTL_MS) return null;
+    return convo.pendingIntent as OwnerIntent;
+  }
+
+  private async setPendingConfirmation(
+    conversationId: string,
+    intent: OwnerIntent,
+  ): Promise<void> {
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { pendingIntent: intent, pendingIntentAt: new Date() },
+    });
+  }
+
+  private async clearPendingConfirmation(conversationId: string): Promise<void> {
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { pendingIntent: null, pendingIntentAt: null },
+    });
+  }
+
+  /**
+   * Wipe the brand profile and restart the interview. Scheduled posts stay
+   * put — this resets who they are to us, not what's already queued.
+   */
+  private async startOver(
+    customerId: string,
+    phone: string,
+    conversationId: string,
+  ): Promise<void> {
+    await this.prisma.brandProfile.updateMany({
+      where: { customerId },
+      data: {
+        businessType: null,
+        voiceTone: null,
+        targetCustomer: null,
+        offers: [],
+        dosAndDonts: [],
+        postingFrequency: null,
+        brandColors: [],
+        visualStyle: null,
+        contentStrategy: Prisma.DbNull,
+        onboardingComplete: false,
+      },
+    });
+    await this.prisma.customer.update({
+      where: { id: customerId },
+      data: {
+        status: 'onboarding',
+        businessName: null,
+        archetypeSlug: null,
+        archetypeConfidence: null,
+      },
+    });
+    return this.reply(
+      phone,
+      conversationId,
+      `Fresh start ✳ ${this.onboarding.question('business_type')}`,
+    );
+  }
+
+  /**
    * A real answer to a real question — grounded in this customer's actual
    * state so the model can't invent features. Replaces the canned "Happy to
    * help!" that used to dead-end every question (and repeat itself).
@@ -617,7 +747,11 @@ export class ConciergeService {
           ? `Open photo/video asks they still owe: ${openAsks.map((a) => a.prompt).join(' | ')}. They upload at ${site}/upload?c=${customerId}`
           : 'No photo asks are open right now.',
         `They connect social accounts at ${site}/connect?c=${customerId} (we never see passwords).`,
-        'Keywords that always work: STOP, HELP, UPGRADE, REFER, AUTOPILOT, MANUAL, PLAN (see their strategy), RESET (redo profile).',
+        'They do NOT need keywords — they can ask for anything in their own',
+        'words and it is understood: seeing their plan, posting without',
+        'approval, going back to approving, upgrading, referring someone,',
+        'starting their profile over. The only exact words that matter are',
+        'STOP (pauses everything) and HELP.',
         '',
         'THEIR CURRENT PLAN (quote from this if they ask what you are doing',
         'for them, what their strategy is, or what is coming up):',
@@ -800,7 +934,7 @@ export class ConciergeService {
     return (
       "\n\nBy the way — you've approved everything I've sent for a while now. " +
       'Want me to put the routine posts on autopilot and only check with you ' +
-      'on promos and anything sensitive? Reply AUTOPILOT to switch it on.'
+      'on promos and anything sensitive? Just say the word.'
     );
   }
 

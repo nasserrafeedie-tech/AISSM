@@ -11,7 +11,17 @@ import { useEffect, useRef, useState } from 'react';
  */
 type Bubble = { who: 'owner' | 'handled'; text: string };
 
-const QUICK = ['hi', 'yes', 'STOP', 'AUTOPILOT', 'MANUAL', 'UPGRADE', 'REFER'];
+// Deliberately phrased like a person, not like commands — the product
+// interprets meaning now, and the simulator should demo that.
+const QUICK = [
+  'hi',
+  'yes',
+  "what's my plan?",
+  'just post it, stop asking me',
+  'check with me first from now on',
+  'how do I get reels?',
+  'STOP',
+];
 
 export default function DevSmsPage() {
   const api = process.env.NEXT_PUBLIC_API_URL;
