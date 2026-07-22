@@ -42,6 +42,7 @@ const UNIVERSAL: string[] = [
   'Weave 1-2 plain search keywords naturally into the first two sentences (what the business is, what it sells, the neighbourhood it is in). These platforms are search engines now; keywords in the caption do more for discovery than hashtags.',
   'Earn a SEND or a SAVE, not a like. Close with a reason to forward it to a specific person ("send this to whoever…") or to keep it ("save this for…"). Sends are weighted several times more than likes for reaching new people.',
   'Be concrete. Real prices, real hours, real names, real details from the brand profile. Never invent facts, offers, or claims.',
+  'Use the location exactly as the profile gives it — the neighbourhood name is your safest hashtag. Never translate a place name, never use a non-English hashtag, and never expand an abbreviation into a guessed city: "LA" stays the location as written, it does not become "Louisiana" or "New Orleans". A wrong-city hashtag sends the post to the wrong town.',
   'No engagement-bait ("comment YES below", "tag 3 friends"), no hollow hype, no emoji soup. One or two emoji at most, and only where a person would actually use one.',
 ];
 

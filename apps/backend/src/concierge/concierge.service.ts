@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import type { Task } from '@smm/contracts';
+import type { Task, CalendarSlot } from '@smm/contracts';
 import { normalizePhone } from '../common/phone';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskBus } from '../tasks/task-bus.service';
@@ -25,6 +25,7 @@ import {
   inTextingWindow,
   nextTextingWindowOpen,
   tomorrowMorningInZone,
+  zonedToUtc,
 } from '../common/time';
 import { z } from 'zod';
 import { strategySummary } from './strategy-summary';
@@ -932,18 +933,87 @@ export class ConciergeService {
       this.log.warn(`archetype assignment failed for ${customerId}: ${String(e)}`),
     );
 
-    // Send the connect link and kick off week 1 (§6).
+    // Send the connect link, then write the first week's posts so the owner
+    // has something to look at immediately. Planning alone used to be the end
+    // of it — the owner was told "posts lined up" with nothing behind it, and
+    // the actual drafts did not appear until the next Monday cron, up to a week
+    // later. The first thing a new signup should get is the magic, not a
+    // promise of it.
     const site = process.env.PUBLIC_SITE_URL ?? 'https://texthandled.com';
-    const result = await this.bus.emit(
-      this.task(customerId, 'PLAN_WEEK', { week_start: nextMonday() }, 'concierge'),
-    );
     await this.reply(
       phone,
       conversationId,
       `Next, whenever you have two minutes: connect the accounts you want ` +
         `me to post to (secure link, we never see your passwords): ` +
-        `${site}/connect?c=${customerId}\n\nMeanwhile — ${result.summary_for_owner}`,
+        `${site}/connect?c=${customerId}\n\n` +
+        `Meanwhile I'm writing your first week — give me a moment.`,
     );
+
+    const drafted = await this.draftFirstWeek(customerId);
+    const shown = drafted
+      ? await this.presentNextDraft(customerId, "Here's the first one ✳", {
+          promptedByOwner: true,
+        })
+      : false;
+    if (!shown) {
+      // Nothing to show — planning or every draft failed. Say so plainly
+      // rather than leave them waiting on a draft that isn't coming.
+      await this.notify(
+        customerId,
+        "I've planned your week and I'm putting the posts together — I'll text " +
+          'you the first one to look at shortly.',
+        { promptedByOwner: true },
+      );
+    }
+  }
+
+  /**
+   * Plan and draft this owner's first week, returning how many drafts landed.
+   *
+   * Mirrors the weekly cron's plan → draft loop, but lives here because it runs
+   * the moment onboarding finishes rather than on the Monday schedule. Uses
+   * nextMonday() like the cron does, so the two never draft the same week: the
+   * cron always plans the week after whatever is next.
+   */
+  private async draftFirstWeek(customerId: string): Promise<number> {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { timezone: true },
+    });
+    const tz = customer?.timezone ?? 'America/Los_Angeles';
+
+    const planned = await this.bus.emit(
+      this.task(customerId, 'PLAN_WEEK', { week_start: nextMonday() }, 'concierge'),
+    );
+    const slots =
+      (planned.data as { slots?: CalendarSlot[] } | null | undefined)?.slots ?? [];
+
+    let drafted = 0;
+    for (const slot of slots) {
+      try {
+        await this.bus.emit(
+          this.task(
+            customerId,
+            'DRAFT_POST',
+            {
+              platform: slot.platform,
+              archetype: slot.archetype,
+              scheduled_time: zonedToUtc(slot.date, slot.best_time, tz).toISOString(),
+              needs_asset: slot.needs_asset,
+              shot_list_hint: slot.shot_list,
+            },
+            'concierge',
+          ),
+        );
+        drafted++;
+      } catch (e) {
+        // One bad draft must not cost the owner their whole first week.
+        this.log.warn(
+          `first-week draft failed for ${customerId} on ${slot.date}: ${String(e)}`,
+        );
+      }
+    }
+    return drafted;
   }
 
   /**
