@@ -297,6 +297,66 @@ export function buildReadinessReport(): ReadinessReport {
   ];
   groups.push({ name: 'Plumbing', state: worstState(plumbing), checks: plumbing });
 
+  // ── Making pictures ─────────────────────────────────────────────────────
+  // Which visual features are actually live. Worth its own group because the
+  // answer is easy to lose track of: an image key set straight in the hosting
+  // dashboard leaves no trace in the repo, so "is generation on in production?"
+  // becomes a thing you remember rather than a thing you check.
+  const pictures: ReadinessCheck[] = [
+    (() => {
+      const what = 'Making a photo when the owner sent none';
+      const openai = env('OPENAI_API_KEY');
+      const fal = env('FAL_API_KEY');
+      if (!openai && !fal) {
+        return {
+          what,
+          state: 'not_yet' as CheckState,
+          note:
+            'No image provider set (OPENAI_API_KEY, or FAL_API_KEY as a fallback). ' +
+            'Everything else still works — captions, carousels, and the owner’s own ' +
+            'photos are all unaffected. Only the single generated photo is off.',
+          blocking: false,
+        };
+      }
+      const key = openai ? 'OPENAI_API_KEY' : 'FAL_API_KEY';
+      if (hasStrayWhitespace(key)) {
+        return {
+          what,
+          state: 'malformed' as CheckState,
+          note: `${key} has stray spaces or a line break — re-paste it.`,
+          blocking: false,
+        };
+      }
+      if (openai && !openai.startsWith('sk-')) {
+        return {
+          what,
+          state: 'malformed' as CheckState,
+          note: 'OPENAI_API_KEY does not start with "sk-" — is that really an OpenAI key?',
+          blocking: false,
+        };
+      }
+      return {
+        what,
+        state: 'ready' as CheckState,
+        note: openai
+          ? 'OpenAI image generation is on. Every image is checked against the ' +
+            'place guardrail before it is ever attached to a post.'
+          : 'FLUX (fal.ai) is on as the image provider.',
+        blocking: false,
+      };
+    })(),
+    {
+      // Stated explicitly because it is the thing people assume needs a key.
+      what: 'Carousels (the Growth+ flagship)',
+      state: 'ready',
+      note:
+        'Always on. Carousels are rendered from text by our own graphics engine, ' +
+        'so they need no image provider, no API key, and cost nothing per slide.',
+      blocking: false,
+    },
+  ];
+  groups.push({ name: 'Making pictures', state: worstState(pictures), checks: pictures });
+
   // ── Waiting on a first customer ─────────────────────────────────────────
   const later: ReadinessCheck[] = [
     check('Publishing to Instagram/Facebook', ['POST_FOR_ME_API_KEY'], {

@@ -55,6 +55,13 @@ services:
       # ── Optional: fill these later to flip paid features on ────────────
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Generated photography, for posts where the owner sent no picture.
+      # Optional: captions, carousels and owner photos all work without it —
+      # carousels are rendered from text, so they never touch an image API.
+      # Declared here so a fresh environment is asked for it rather than
+      # quietly shipping with generation switched off.
+      - key: OPENAI_API_KEY
+        sync: false
       - key: POST_FOR_ME_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
