@@ -1,6 +1,18 @@
-import { Controller, Get, Headers, NotFoundException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  NotFoundException,
+  Post as HttpPost,
+} from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
+import { TaskBus } from '../tasks/task-bus.service';
 import { BusinessMetricsService } from './business-metrics.service';
+
+const PublishNowBody = z.object({ postId: z.string().uuid() });
 
 /**
  * Operator's eyes — NOT a customer dashboard (§2: customers never get one).
@@ -12,8 +24,52 @@ import { BusinessMetricsService } from './business-metrics.service';
 export class AdminController {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly bus: TaskBus,
     private readonly metrics: BusinessMetricsService,
   ) {}
+
+  /**
+   * Publish one approved post immediately.
+   *
+   * Posts normally fire from their own queued job at the scheduled minute, with
+   * the hourly sweep as a backstop. Neither helps when a post is stuck and
+   * somebody needs it out NOW — until this, the only recovery was to wait up to
+   * an hour for the sweep and hope. Same PUBLISH_DUE path as everything else, so
+   * the approval gate, platform limits and AI disclosure all still apply; the
+   * only thing being overridden is the clock.
+   */
+  @HttpPost('publish-now')
+  async publishNow(
+    @Headers('x-admin-token') token: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const expected = process.env.ADMIN_TOKEN;
+    if (!expected || token !== expected) throw new NotFoundException();
+    const { postId } = PublishNowBody.parse(body);
+
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new NotFoundException(`no post ${postId}`);
+    // Never a way to skip the owner's approval — that gate is the product.
+    if (post.approvalState !== 'approved') {
+      return { published: false, reason: `post is ${post.approvalState}, not approved` };
+    }
+
+    // Bring it due, then run the same sweep the scheduler runs.
+    await this.prisma.post.update({
+      where: { id: postId },
+      data: { scheduledTime: new Date(Date.now() - 1000) },
+    });
+    const result = await this.bus.emit({
+      task_id: randomUUID(),
+      customer_id: post.customerId,
+      type: 'PUBLISH_DUE',
+      payload: {},
+      requires_approval: false,
+      created_by: 'cron',
+      created_at: new Date().toISOString(),
+    } as never);
+    return { published: true, result };
+  }
 
   @Get('overview')
   async overview(@Headers('x-admin-token') token: string | undefined) {
