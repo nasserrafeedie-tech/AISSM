@@ -54,16 +54,16 @@ export class AdminController {
       return { published: false, reason: `post is ${post.approvalState}, not approved` };
     }
 
-    // Bring it due, then run the same sweep the scheduler runs.
-    await this.prisma.post.update({
-      where: { id: postId },
-      data: { scheduledTime: new Date(Date.now() - 1000) },
-    });
+    // Name the post explicitly. PUBLISH_DUE's sweep only looks at posts in
+    // 'scheduled' status whose time has passed, so an approved post that never
+    // got queued is invisible to it — which is exactly the post someone needs
+    // this endpoint for. Passing post_id skips the due-time query entirely; the
+    // §8 publish gate inside the handler still runs on it.
     const result = await this.bus.emit({
       task_id: randomUUID(),
       customer_id: post.customerId,
       type: 'PUBLISH_DUE',
-      payload: {},
+      payload: { post_id: postId },
       requires_approval: false,
       created_by: 'cron',
       created_at: new Date().toISOString(),
