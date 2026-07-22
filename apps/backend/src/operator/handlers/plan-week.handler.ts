@@ -12,6 +12,47 @@ import { resolveStrategy, strategyPlanningBlock } from '../llm/vertical-playbook
 import { TaskHandler, ok, fail } from './handler.interface';
 import { archetypePlanningBlock } from '../../playbook/archetype-context';
 import { ArchetypePerformanceService } from '../../playbook/archetype-performance.service';
+import { isCarouselArchetype } from '../graphics/carousel-content';
+
+/** The most photo asks an owner should get in one week. */
+export const MAX_ASSET_ASKS = 2;
+
+/**
+ * Hold the week to a realistic number of photo asks.
+ *
+ * The prompt asks for this, but a prompt is a request and this is a guarantee.
+ * Asked to plan a week, the model will happily mark every slot `needs_asset` —
+ * and that has a worse consequence than nagging. A slot waiting on a photo is
+ * skipped by both carousel and image generation, so a customer who never gets
+ * round to sending pictures receives a week of bare text posts and never sees
+ * the feature they upgraded for. Measured on a real account: 5 of 5 slots asked
+ * for a photo, and not one carousel was built.
+ *
+ * When asks have to be given up, the carousel-eligible archetypes yield first.
+ * They already have a strong automatic fallback — branded slides — whereas a
+ * behind-the-scenes or we're-open post with no photo has nothing to fall back
+ * on. The owner can still send a photo for any post at any time; this only
+ * decides where we spend the asks.
+ */
+export function clampAssetAsks<T extends { archetype: string; needs_asset: boolean }>(
+  slots: T[],
+): T[] {
+  const asking = slots.filter((s) => s.needs_asset);
+  if (asking.length <= MAX_ASSET_ASKS) return slots;
+
+  const keep = new Set(
+    [...asking]
+      .sort(
+        (a, b) =>
+          Number(isCarouselArchetype(a.archetype as never)) -
+          Number(isCarouselArchetype(b.archetype as never)),
+      )
+      .slice(0, MAX_ASSET_ASKS),
+  );
+  return slots.map((s) =>
+    s.needs_asset && !keep.has(s) ? { ...s, needs_asset: false } : s,
+  );
+}
 
 /**
  * PLAN_WEEK (§7). Read brand_profile + recent metrics → produce a week's
@@ -68,7 +109,12 @@ export class PlanWeekHandler implements TaskHandler<'PLAN_WEEK'> {
       `Plan ${frequency} posts for the week starting ${task.payload.week_start.slice(0, 10)}.`,
       'Mix archetypes across the week (promo, behind_the_scenes, testimonial,',
       'educational_tip, product_spotlight, seasonal, ugc_repost, were_open).',
-      'Prefer slots that use the owner\'s real photos.',
+      // Asking for a photo on every slot reads as homework and gets ignored,
+      // and it starves the slots that would otherwise produce a carousel. Ask
+      // only where a real photo is genuinely the point — people and places.
+      'Set needs_asset TRUE on AT MOST 2 slots in the whole week, and only where',
+      'a real photo is the point of the post (the team, the space, a finished',
+      'job). Leave it FALSE elsewhere — we design those posts ourselves.',
       // The playbook for some trades (dentists, restaurants) pushes Google
       // Business Profile, Reels, and Stories — none of which are a "platform"
       // we can post to. Constrain it up front so the week does not silently
@@ -93,6 +139,19 @@ export class PlanWeekHandler implements TaskHandler<'PLAN_WEEK'> {
       { tier: 'voice', cachedContext: context, prompt, maxTokens: 1500, customerId: task.customer_id },
       PlanWeekLlmOutput,
     );
+
+    // Hold the model to a realistic number of photo asks before anything is
+    // persisted, so the rest of the week is free to be designed rather than
+    // sitting idle waiting on pictures that may never arrive.
+    const asked = planned.slots.filter((s) => s.needs_asset).length;
+    planned.slots = clampAssetAsks(planned.slots);
+    const kept = planned.slots.filter((s) => s.needs_asset).length;
+    if (kept < asked) {
+      this.log.warn(
+        `planner asked for ${asked} photos this week for ${task.customer_id}; ` +
+          `kept ${kept} so the rest of the week can be designed`,
+      );
+    }
 
     // Create shot_list_requests for slots that need a real asset (§7).
     const shotListIds: string[] = [];
