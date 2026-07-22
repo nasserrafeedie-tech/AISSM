@@ -77,6 +77,23 @@ export class DraftPostHandler implements TaskHandler<'DRAFT_POST'> {
     });
     const prompt = [
       `Write one ${archetype} post for ${platform}.`,
+      // Without this the model has no idea what day it is and writes whatever
+      // season it feels like — a week planned in July opened with "November's
+      // when local business owners have time to think about their feed", and an
+      // earlier run offered winter advice in midsummer. Anything timely has to
+      // be anchored to the day the post actually goes out.
+      (() => {
+        const when = task.payload.scheduled_time
+          ? new Date(task.payload.scheduled_time)
+          : new Date();
+        const stamp = when.toLocaleDateString('en-US', {
+          weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+          timeZone: customer.timezone ?? 'America/Los_Angeles',
+        });
+        return `This post publishes on ${stamp}. Any reference to the date, the ` +
+          `season, the weather or the time of year MUST match that day. Do not ` +
+          `mention a different month or season.`;
+      })(),
       task.payload.prompt_notes ? `Notes: ${task.payload.prompt_notes}.` : '',
       '',
       // How this platform actually ranks content — see llm/playbook.ts.

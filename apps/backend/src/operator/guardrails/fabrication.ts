@@ -18,9 +18,20 @@
  * it used verbatim, so the caller passes that in and the check stands down.
  */
 
-/** Speech attributed to someone: "…" told us / said / says / wrote. */
-const ATTRIBUTED_QUOTE =
-  /["“”'‘’][^"“”]{12,}["“”'‘’]\s*[—-]?\s*|(?:told|said|says|wrote|shared|texted|messaged)\s+(?:us|me)\b/i;
+/**
+ * Someone reporting speech to us: "…told us", "…said".
+ *
+ * The quote characters deliberately exclude apostrophes. An earlier version
+ * accepted them as delimiters, so "doesn't … don't" read as a quoted span and
+ * the check fired on four captions out of five — none of which had invented
+ * anything. A guard that cries wolf on ordinary contractions is worse than no
+ * guard: it burns a rewrite on every post and pins clean work to manual
+ * approval. Attribution is the signal, not punctuation.
+ */
+const ATTRIBUTION = /\b(?:told|said|says|wrote|shared|texted|messaged)\s+(?:us|me)\b/i;
+
+/** A span inside real double quotes — never apostrophes. */
+const QUOTED_SPAN = /["“][^"”\n]{12,}["”]/;
 
 /**
  * A specific customer conjured out of nothing — "a salon owner", "one of our
@@ -64,24 +75,31 @@ export function detectFabrication(
   hasRealQuote = false,
 ): FabricationFinding[] {
   const out: FabricationFinding[] = [];
-  const quoted = ATTRIBUTED_QUOTE.test(caption);
-  const person = INVENTED_PERSON.test(caption) || SITUATED_PERSON.test(caption);
+  if (hasRealQuote) return out;
 
-  if (!hasRealQuote && quoted && person) {
+  const attributed = ATTRIBUTION.test(caption);
+  const person = INVENTED_PERSON.test(caption) || SITUATED_PERSON.test(caption);
+  const quoted = QUOTED_SPAN.test(caption);
+
+  // Reporting what a specific person said is the shape that matters. Either
+  // half alone is ordinary copy — plural sentiment ("owners tell us…") has no
+  // one person in it, and a quoted phrase with nobody behind it is just a
+  // turn of phrase.
+  if (attributed && (person || quoted)) {
     out.push({
       name: 'attributed_quote',
-      detail: 'quotes a specific customer who does not exist',
+      detail: 'reports what a specific customer said, and we have no such quote',
     });
-  } else if (!hasRealQuote && quoted) {
+  } else if (person && quoted) {
     out.push({
       name: 'attributed_quote',
-      detail: 'attributes a quote to someone, with no real quote on file',
+      detail: 'puts words in the mouth of one invented customer',
     });
-  } else if (!hasRealQuote && person) {
+  } else if (person) {
     out.push({ name: 'invented_person', detail: 'describes one specific customer' });
   }
 
-  if (!hasRealQuote && CLAIMED_RESULT.test(caption) && person) {
+  if (person && CLAIMED_RESULT.test(caption)) {
     out.push({
       name: 'claimed_result',
       detail: 'claims a result for a customer we invented',

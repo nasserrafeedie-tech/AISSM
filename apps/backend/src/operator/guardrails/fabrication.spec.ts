@@ -44,6 +44,31 @@ describe('detectFabrication', () => {
     );
   });
 
+  /**
+   * All four are real captions the guard wrongly flagged on its first live run,
+   * every one of them clean. The cause was apostrophes being treated as quote
+   * marks, so any two contractions in a sentence looked like reported speech. A
+   * guard that fires on ordinary writing burns a rewrite on every post and pins
+   * clean work to manual approval — worse than not having one.
+   */
+  it('leaves ordinary contractions alone', () => {
+    for (const caption of [
+      "The algorithm doesn't care how perfect your photo is—it cares that you didn't disappear.",
+      "That typo you almost sent? We catch it. Your name doesn't deserve a spelling mistake.",
+      "Your phone doesn't need another login. That's the whole point.",
+      "We're open today until 6. Text us your schedule once and we'll handle the rest.",
+    ]) {
+      assert.deepEqual(detectFabrication(caption), [], `false positive on: ${caption}`);
+    }
+  });
+
+  it('does not flag plural customers described in general', () => {
+    assert.deepEqual(
+      detectFabrication('We built this for South Bay salon owners and cafe managers who already have seventeen passwords.'),
+      [],
+    );
+  });
+
   it('stands down when the owner gave a real quote', () => {
     const caption = 'A regular told us: "best haircut in the South Bay." We will take it.';
     assert.ok(detectFabrication(caption).length > 0, 'flagged without a source quote');
