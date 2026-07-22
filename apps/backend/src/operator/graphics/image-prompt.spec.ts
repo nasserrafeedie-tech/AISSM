@@ -4,6 +4,8 @@ import { describe, it } from 'node:test';
 import {
   buildImagePrompt,
   claimsSpecificPlace,
+  depictsPlace,
+  shouldRefuseSubject,
   NEGATIVE_PROMPT,
   stripOwnershipClaims,
   subjectInstruction,
@@ -118,10 +120,12 @@ describe('NEGATIVE_PROMPT', () => {
 });
 
 describe('subjectInstruction', () => {
-  it('forbids the specific business and its exterior', () => {
+  it('forbids the specific business, its exterior, and any place', () => {
     const instr = subjectInstruction(BRIEF);
-    assert.match(instr, /Never the specific business/);
-    assert.match(instr, /no storefront/);
+    assert.match(instr, /specific business/);
+    assert.match(instr, /storefront/);
+    assert.match(instr, /NEVER a place/);
+    assert.match(instr, /treatment room/);
   });
 
   it('includes the caption so the subject matches the post', () => {
@@ -134,3 +138,38 @@ describe('subjectInstruction', () => {
     assert.ok(!instr.includes('The post says'));
   });
 });
+
+describe('depictsPlace / shouldRefuseSubject — a place is never generated', () => {
+  it('refuses the premises: rooms, interiors, the space itself', () => {
+    for (const s of [
+      'a calm modern dental treatment room with a clean chair',
+      'a cozy coffee shop interior with warm lighting',
+      'the dining area with tables set for dinner',
+      'a bright salon floor with styling stations',
+      'the waiting room at golden hour',
+      'a storefront exterior on a rainy day',
+      'a wide establishing shot of the gym',
+    ]) {
+      assert.ok(depictsPlace(s), `should have refused a place: ${s}`);
+      assert.ok(shouldRefuseSubject(s), `shouldRefuseSubject missed: ${s}`);
+    }
+  });
+
+  it('allows a product on a surface — a counter or tray is not a room', () => {
+    for (const s of [
+      'a cortado on a worn wooden counter',
+      'dental floss beside a toothbrush on a bright counter',
+      'a shade guide fanned out on a clean white tray',
+      'three street tacos on a paper-lined metal tray',
+      'a set of nail polish bottles on a marble shelf',
+    ]) {
+      assert.ok(!depictsPlace(s), `false positive on a product: ${s}`);
+      assert.ok(!shouldRefuseSubject(s), `wrongly refused a product: ${s}`);
+    }
+  });
+
+  it('the dental office image that started this is now refused', () => {
+    // The exact subject that produced a fake treatment room.
+    assert.ok(shouldRefuseSubject('a calm, modern dental treatment room with a clean empty chair'));
+  });
+})

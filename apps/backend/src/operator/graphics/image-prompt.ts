@@ -50,6 +50,7 @@ const HARD_CONSTRAINTS = [
 export const NEGATIVE_PROMPT = [
   'text, words, letters, numbers, captions, watermark, signature, logo, brand mark, signage, menu board',
   'human face, person, portrait, hands with visible detail, crowd',
+  'room, interior, exterior, storefront, building, wide establishing shot, empty room',
   'deformed, distorted, extra fingers, malformed',
   'oversaturated, HDR, plastic, artificial-looking, stock-photo cliché',
 ].join(', ');
@@ -90,6 +91,39 @@ export function claimsSpecificPlace(subject: string): boolean {
 }
 
 /**
+ * Words that mean the subject is a PLACE, not a thing.
+ *
+ * The line that matters: a photo of a product ("floss on a counter", "a shade
+ * guide on a tray") is honest — it's the kind of thing the business uses. A
+ * photo of a space ("a dental treatment room", "the dining area", "a modern
+ * salon interior") reads as *their* premises, and generating one is a picture
+ * of a place that doesn't exist. Those are always the owner's to photograph, so
+ * a place-subject is refused and turned into a shot-list ask instead.
+ *
+ * "Counter", "table", "tray", "shelf" are surfaces a thing sits on, not rooms —
+ * deliberately absent so ordinary product shots pass.
+ */
+const PLACE_SCENE_SOURCE = String.raw`\b(?:interior|exterior|storefront|shopfront|facade|façade|lobby|foyer|reception|entrance|entryway|hallway|corridor|room|operatory|premises|showroom|shopfloor|shop\s+floor|salon\s+floor|gym\s+floor|dining\s+(?:area|room|space)|seating\s+(?:area|space)|waiting\s+(?:area|room)|treatment\s+(?:area|room)|the\s+space|the\s+shop\b|the\s+salon\b|the\s+studio\b|the\s+gym\b|the\s+office\b|inside\s+the|indoors|storefit|building|dining\s+hall|wide\s+(?:shot|angle)|establishing\s+shot)\b`;
+const placeRe = () => new RegExp(PLACE_SCENE_SOURCE, 'i');
+
+/**
+ * Does this subject depict a place rather than a thing? A place is the
+ * business's space, which we never fabricate — those get a real-photo ask.
+ */
+export function depictsPlace(subject: string): boolean {
+  return placeRe().test(subject);
+}
+
+/**
+ * The single gate the generator asks before spending anything: refuse a subject
+ * that either names a specific business or depicts a place. Both mean "ask the
+ * owner for a real photo instead."
+ */
+export function shouldRefuseSubject(subject: string): boolean {
+  return claimsSpecificPlace(subject) || depictsPlace(subject);
+}
+
+/**
  * Build the final prompt.
  *
  * `subject` is the only variable part — a short, concrete noun phrase for what
@@ -101,12 +135,17 @@ export function buildImagePrompt(brief: ImageBrief, subject: string): string {
 
   const parts = [
     cleaned,
-    // Generic-of-category, said explicitly. The model is being told what kind
-    // of business this is so the props are right, not whose business it is.
-    `in the setting of an independent ${brief.businessType}`,
+    // A close-up of the THING, not a view of a place. "in the setting of…"
+    // used to invite a whole room, which produced fake premises — a dental
+    // treatment room, a café interior. The business type is a category hint
+    // for the props, not a scene to build.
+    `the kind of thing an independent ${brief.businessType} sells or uses`,
+    'a tight close-up product photograph, the subject filling most of the frame',
     brief.visualStyle ? `${brief.visualStyle} styling` : 'natural, unstyled',
-    'natural light, shallow depth of field, photographed on a 50mm lens',
+    'natural light, shallow depth of field, 50mm lens',
+    'background thrown far out of focus and non-specific',
     'candid, not a stock photo',
+    'not a room, not an interior, not a building, not an establishing shot',
     ...HARD_CONSTRAINTS,
   ];
 
@@ -125,10 +164,13 @@ export function subjectInstruction(brief: ImageBrief): string {
     '',
     'Return JSON: {"subject": string} — one short noun phrase naming what is in the frame, under 15 words.',
     'Rules:',
-    '- Describe a thing, close up. "A cortado on a worn wooden counter", not "a coffee shop".',
-    '- It must be a generic example of what this kind of business sells or uses.',
-    '  Never the specific business: no storefront, no exterior, no named place.',
-    '- Do not use "our", "their", or "the shop\'s".',
+    '- It must be a THING, shot close up — a product, tool, ingredient, or dish.',
+    '  "A cortado on a worn wooden counter", "dental floss beside a toothbrush".',
+    '- NEVER a place. No room, interior, treatment room, dining room, office,',
+    '  waiting room, salon floor, storefront, exterior, or building. We ask the',
+    '  owner for photos of their actual space — you only picture the things.',
+    '- A generic example of what this kind of business sells or uses, never the',
+    '  specific business. Do not use "our", "their", or "the shop\'s".',
     '- No people, no faces, no hands in detail.',
     '- No text, signs, menus, or labels in the frame.',
   ]

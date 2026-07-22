@@ -30,12 +30,55 @@ const lenientEnum = <T extends [string, ...string[]]>(e: z.ZodEnum<T>) =>
     e,
   );
 
+/**
+ * Planner models keep confusing a platform with a format. "Reels" and "Stories"
+ * are Instagram surfaces, not separate platforms, and a model following a
+ * playbook writes them as if they were — which used to fail the whole week's
+ * plan on a strict enum. These map to their real platform. Aliases for
+ * platforms we do not support (Google Business Profile) are deliberately absent
+ * so those slots drop out rather than being mis-posted somewhere else.
+ */
+const PLATFORM_ALIAS: Record<string, string> = {
+  instagram_reels: 'instagram',
+  instagram_reel: 'instagram',
+  reels: 'instagram',
+  reel: 'instagram',
+  instagram_stories: 'instagram',
+  instagram_story: 'instagram',
+  stories: 'instagram',
+  story: 'instagram',
+  ig: 'instagram',
+  insta: 'instagram',
+  fb: 'facebook',
+  twitter: 'x',
+};
+
+const platformField = z.preprocess((v) => {
+  if (typeof v !== 'string') return v;
+  const norm = v.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return PLATFORM_ALIAS[norm] ?? norm;
+}, Platform);
+
+/**
+ * An array that drops elements it cannot parse instead of failing whole.
+ *
+ * One slot the planner scheduled to an unsupported platform (Google Business
+ * Profile, which dentists' playbooks all push) used to reject the entire week —
+ * the owner got zero posts. Better to keep the four good slots and quietly lose
+ * the one we cannot serve than to lose the week over it.
+ */
+const droppingArray = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess(
+    (v) => (Array.isArray(v) ? v.filter((el) => schema.safeParse(el).success) : v),
+    z.array(schema),
+  );
+
 /** One slot in a planned week (PLAN_WEEK result + the LLM planning output). */
 export const CalendarSlot = z
   .object({
     date: isoDate,
     archetype: lenientEnum(PostArchetype),
-    platform: lenientEnum(Platform),
+    platform: platformField,
     best_time: z.string().regex(/^\d{2}:\d{2}$/, 'HH:MM'),
     needs_asset: z.boolean(),
     // Models often return a shot LIST as an actual list — accept both shapes
@@ -56,7 +99,7 @@ export type CalendarSlot = z.infer<typeof CalendarSlot>;
 export const PlanWeekResult = z
   .object({
     week_start: isoDate,
-    slots: z.array(CalendarSlot),
+    slots: droppingArray(CalendarSlot),
     shot_list_request_ids: z.array(z.string().uuid()).default([]),
   })
   .strict();
@@ -106,7 +149,7 @@ export type FetchMetricsResult = z.infer<typeof FetchMetricsResult>;
  * used by `parseLlmJson` so a malformed model response is rejected + retried.
  */
 export const PlanWeekLlmOutput = z
-  .object({ slots: z.array(CalendarSlot) })
+  .object({ slots: droppingArray(CalendarSlot) })
   .strict();
 export type PlanWeekLlmOutput = z.infer<typeof PlanWeekLlmOutput>;
 

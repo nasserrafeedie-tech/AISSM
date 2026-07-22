@@ -69,6 +69,15 @@ export class PlanWeekHandler implements TaskHandler<'PLAN_WEEK'> {
       'Mix archetypes across the week (promo, behind_the_scenes, testimonial,',
       'educational_tip, product_spotlight, seasonal, ugc_repost, were_open).',
       'Prefer slots that use the owner\'s real photos.',
+      // The playbook for some trades (dentists, restaurants) pushes Google
+      // Business Profile, Reels, and Stories — none of which are a "platform"
+      // we can post to. Constrain it up front so the week does not silently
+      // shrink when those slots get dropped downstream.
+      'platform MUST be one of exactly: instagram, facebook, tiktok, x, ' +
+        'linkedin, threads, youtube. Reels and Stories are Instagram formats — ' +
+        'use "instagram", not "reels"/"stories". Do NOT use Google Business ' +
+        'Profile as a platform. For a local health or service business, favour ' +
+        'instagram and facebook.',
       archetype ? archetypePlanningBlock(archetype) : '',
       strategyPlanningBlock(resolveStrategy(profile)),
       // A bare list of impression counts used to sit here. It told the model

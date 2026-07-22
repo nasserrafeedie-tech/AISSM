@@ -8,6 +8,7 @@ import {
   ContractError,
   LlmJsonError,
   PlanWeekLlmOutput,
+  CalendarSlot,
 } from './index';
 
 const base = {
@@ -120,4 +121,24 @@ test('parseLlmJson skips a truncated block and uses an earlier complete one', ()
 test('parseLlmJson still throws when there is no JSON at all', () => {
   const schema = z.object({ a: z.number() });
   assert.throws(() => parseLlmJson(schema, 'I cannot help with that.'), /not valid JSON/);
+});
+
+test('CalendarSlot maps reels/stories to instagram', () => {
+  const slot = { date: '2026-07-27', archetype: 'promo', platform: 'instagram_reels', best_time: '09:00', needs_asset: false };
+  assert.equal(CalendarSlot.parse(slot).platform, 'instagram');
+  assert.equal(CalendarSlot.parse({ ...slot, platform: 'Stories' }).platform, 'instagram');
+});
+
+test('a plan drops an unsupported-platform slot instead of failing the whole week', () => {
+  // A dentist plan with 2 GBP slots and 3 real ones must yield 3, not zero.
+  const raw = JSON.stringify({ slots: [
+    { date: '2026-07-27', archetype: 'promo', platform: 'instagram', best_time: '09:00', needs_asset: false },
+    { date: '2026-07-28', archetype: 'educational_tip', platform: 'gbp', best_time: '10:00', needs_asset: false },
+    { date: '2026-07-29', archetype: 'behind_the_scenes', platform: 'reels', best_time: '11:00', needs_asset: true },
+    { date: '2026-07-30', archetype: 'testimonial', platform: 'google_business_profile', best_time: '12:00', needs_asset: false },
+    { date: '2026-07-31', archetype: 'seasonal', platform: 'facebook', best_time: '13:00', needs_asset: false },
+  ] });
+  const out = parseLlmJson(PlanWeekLlmOutput, raw);
+  assert.equal(out.slots.length, 3, 'keeps instagram, reels→instagram, facebook; drops the 2 GBP');
+  assert.deepEqual(out.slots.map(s => s.platform).sort(), ['facebook', 'instagram', 'instagram']);
 });

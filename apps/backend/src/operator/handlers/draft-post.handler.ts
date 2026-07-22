@@ -257,7 +257,14 @@ export class DraftPostHandler implements TaskHandler<'DRAFT_POST'> {
     // rather than emitted: a handler dispatching through the TaskBus would
     // close a loop (TaskBus → OperatorService → this handler → TaskBus), so
     // the caller starts the follow-up task instead.
-    const needsImage = !bankedPhoto && customer.aiImagesOptIn;
+    // Generate a photo only when this slot is NOT one we're asking the owner
+    // for a real picture of. A post the planner marked needs_asset gets a
+    // shot-list text ("send me a photo of your team") — generating an AI image
+    // for it too would both nag them and pre-empt their own photo. So the
+    // planner's own split becomes the split between generated and owner photos:
+    // needs_asset slots wait for a real shot, the rest get a generated one.
+    const needsImage =
+      !bankedPhoto && customer.aiImagesOptIn && !task.payload.needs_asset;
 
     const data: DraftPostResult = {
       post_id: post.id,

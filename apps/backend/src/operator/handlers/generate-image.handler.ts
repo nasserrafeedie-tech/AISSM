@@ -7,7 +7,7 @@ import { LlmService } from '../llm/llm.service';
 import { ImageGenService } from '../graphics/image-gen.service';
 import {
   buildImagePrompt,
-  claimsSpecificPlace,
+  shouldRefuseSubject,
   stripOwnershipClaims,
   subjectInstruction,
   type ImageBrief,
@@ -106,16 +106,16 @@ export class GenerateImageHandler implements TaskHandler<'GENERATE_IMAGE'> {
     }
 
     const cleaned = stripOwnershipClaims(subject);
-    if (!cleaned || claimsSpecificPlace(cleaned)) {
+    if (!cleaned || shouldRefuseSubject(cleaned)) {
       // Refuse rather than repair further. An image that claims to be their
       // premises is the one outcome this whole feature must not produce, and a
       // shot-list request costs the owner far less than that.
       this.log.warn(
-        `rejected image subject for ${task.customer_id}: "${subject}" claims a specific place`,
+        `rejected image subject for ${task.customer_id}: "${subject}" is a place or a specific business`,
       );
       return fail(task.task_id,
         "I'd rather use a real photo for this one — could you send me a quick shot?",
-        'subject_claimed_premises', `subject="${subject}"`, true);
+        'subject_is_place', `subject="${subject}"`, true);
     }
 
     const prompt = buildImagePrompt(brief, cleaned);
