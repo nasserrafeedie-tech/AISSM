@@ -133,7 +133,11 @@ export class PostForMeService {
       );
     }
 
-    const data = await this.call<{ id: string }>('POST', '/v1/posts', {
+    // The resource is /v1/social-posts. We were posting to /v1/posts, which
+    // does not exist — every publish came back "Cannot POST /v1/posts", so no
+    // post could ever have gone out. Auth and the request body were fine all
+    // along; it was one wrong word in the path.
+    const data = await this.call<{ id: string }>('POST', '/v1/social-posts', {
       social_accounts: [req.postForMeRef],
       platform: req.platform,
       caption,
@@ -147,7 +151,11 @@ export class PostForMeService {
     this.assertConfigured();
     const data = await this.call<Partial<PlatformMetrics>>(
       'GET',
-      `/v1/posts/${encodeURIComponent(externalPostId)}/insights`,
+      // Same resource name as the create call. UNVERIFIED: the exact insights
+      // path has not been confirmed against their API — /v1/posts was wrong, so
+      // this is the consistent guess rather than a checked fact. Metrics
+      // failing is loud and non-urgent, unlike publishing.
+      `/v1/social-posts/${encodeURIComponent(externalPostId)}/insights`,
     );
     return {
       impressions: data.impressions ?? 0,
