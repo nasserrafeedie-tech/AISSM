@@ -10,6 +10,7 @@ import { PostForMeService } from './publishing/post-for-me.service';
 import { PlaybookModule } from '../playbook/playbook.module';
 import { GraphicsService } from './graphics/graphics.service';
 import { ImageGenService } from './graphics/image-gen.service';
+import { ImageSafetyService } from './graphics/image-safety.service';
 import { BrandIdentityService } from './branding/brand-identity.service';
 import { ReelService } from './video/reel.service';
 import { StorageService } from '../common/storage.service';
@@ -39,6 +40,7 @@ import { GenerateImageHandler } from './handlers/generate-image.handler';
     PostForMeService,
     GraphicsService,
     ImageGenService,
+    ImageSafetyService,
     BrandIdentityService,
     ReelService,
     StorageService,

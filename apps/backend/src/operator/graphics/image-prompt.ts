@@ -143,7 +143,11 @@ export function buildImagePrompt(brief: ImageBrief, subject: string): string {
     'a tight close-up product photograph, the subject filling most of the frame',
     brief.visualStyle ? `${brief.visualStyle} styling` : 'natural, unstyled',
     'natural light, shallow depth of field, 50mm lens',
-    'background thrown far out of focus and non-specific',
+    // The background must not become a place. A soft wash of light and colour,
+    // never a readable room. This is what keeps the pixel-level place check
+    // from rejecting an otherwise-fine product shot.
+    'the background a soft indistinct blur of light and colour, with no ' +
+      'recognizable room, window, furniture, fixtures, shelving, or architecture',
     'candid, not a stock photo',
     'not a room, not an interior, not a building, not an establishing shot',
     ...HARD_CONSTRAINTS,

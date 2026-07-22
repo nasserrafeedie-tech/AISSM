@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../common/storage.service';
 import { LlmService } from '../llm/llm.service';
 import { ImageGenService } from '../graphics/image-gen.service';
+import { ImageSafetyService } from '../graphics/image-safety.service';
 import {
   buildImagePrompt,
   shouldRefuseSubject,
@@ -39,6 +40,7 @@ export class GenerateImageHandler implements TaskHandler<'GENERATE_IMAGE'> {
     private readonly prisma: PrismaService,
     private readonly llm: LlmService,
     private readonly images: ImageGenService,
+    private readonly safety: ImageSafetyService,
     private readonly storage: StorageService,
   ) {}
 
@@ -127,6 +129,21 @@ export class GenerateImageHandler implements TaskHandler<'GENERATE_IMAGE'> {
       return fail(task.task_id,
         "I couldn't make that photo — could you send me one instead?",
         'generation_failed', String(e), true);
+    }
+
+    // Look at the actual pixels before using them. Every check up to here read
+    // the prompt; this reads the output, which is the only way to catch an
+    // image that renders a place despite an innocent subject. A fabricated photo
+    // of the business's premises is the one result that could hurt the brand, so
+    // it never gets attached — the owner is asked for a real photo instead.
+    const verdict = await this.safety.isPlace(image.bytes, image.contentType);
+    if (verdict.isPlace) {
+      this.log.warn(
+        `discarded generated image for ${task.customer_id}: depicts a place (${verdict.reason})`,
+      );
+      return fail(task.task_id,
+        "For this one I'd rather use a real photo — could you send me a quick shot?",
+        'generated_a_place', `reason=${verdict.reason}`, true);
     }
 
     const r2Key = `${task.customer_id}/generated/${randomUUID()}.${image.ext}`;
