@@ -63,11 +63,18 @@ export class PublishDueHandler implements TaskHandler<'PUBLISH_DUE'> {
     let failed = 0;
     const notices: { customer_id: string; message: string }[] = [];
     for (const post of posts) {
-      // §8 publish-time gate: never publish un-approved / un-moderated / paused.
+      // §8 publish-time gate: never publish un-approved / un-moderated / paused,
+      // and never resurrect a post the owner or the system already killed. The
+      // post_id branch above fetches by id with no status filter, so a stray
+      // publish-now on a cancelled/failed/rejected post reaches here — this is
+      // the last line that stops it going out.
       const blocked =
         post.customer.status === 'paused' ||
         post.moderationState !== 'passed' ||
         post.approvalState === 'awaiting_owner' ||
+        post.approvalState === 'rejected' ||
+        post.status === 'cancelled' ||
+        post.status === 'failed' ||
         post.status === 'published';
       if (blocked) {
         skipped++;
@@ -82,13 +89,37 @@ export class PublishDueHandler implements TaskHandler<'PUBLISH_DUE'> {
         continue;
       }
 
+      // A post that was BUILT with media (a carousel, a generated image, an
+      // owner photo) must not silently go out as a bare caption. If every ref
+      // dropped — almost always a missing/misconfigured R2_PUBLIC_BASE_URL —
+      // publishing text-only would make the flagship feature vanish with
+      // nothing surfaced. Fail loudly instead, so it's caught, not shipped.
+      const mediaUrls = this.resolveMediaUrls(post.id, post.mediaRefs);
+      if (post.mediaRefs.length > 0 && mediaUrls.length === 0) {
+        this.log.error(
+          `post ${post.id}: ${post.mediaRefs.length} media ref(s) but none ` +
+            'resolved to a URL — refusing to publish it caption-only. Check ' +
+            'R2_PUBLIC_BASE_URL.',
+        );
+        await this.prisma.post.update({
+          where: { id: post.id },
+          data: {
+            status: 'failed',
+            failureReason:
+              'media could not be resolved to a public URL (R2_PUBLIC_BASE_URL?) — not published as text-only',
+          },
+        });
+        failed++;
+        continue;
+      }
+
       try {
         const outcome = await this.postForMe.publish({
           platform: post.platform,
           postForMeRef: account.postForMeRef,
           caption: post.caption ?? '',
           hashtags: post.hashtags,
-          mediaUrls: this.resolveMediaUrls(post.id, post.mediaRefs),
+          mediaUrls,
           // Instagram and TikTok both require model-made imagery to be
           // declared. Undisclosed AI content is a risk to the owner's account,
           // not ours, so this travels with every publish.

@@ -193,6 +193,17 @@ export class AdminController {
     if (post.approvalState === 'approved') {
       return { changed: false, reason: 'already approved' };
     }
+    // Approve ONLY a post that is actually waiting for the owner. Without this,
+    // a mistyped id pointing at a post the owner already REJECTED would flip it
+    // back to approved — and publish-now would then send content the owner
+    // explicitly killed. The one thing the product must never do. A post that
+    // is not awaiting the owner is not ours to approve on their behalf.
+    if (post.approvalState !== 'awaiting_owner') {
+      return {
+        changed: false,
+        reason: `post is ${post.approvalState}, not awaiting the owner — refusing to approve`,
+      };
+    }
 
     await this.prisma.post.update({
       where: { id: postId },
@@ -229,6 +240,20 @@ export class AdminController {
   ) {
     const expected = process.env.ADMIN_TOKEN;
     if (!expected || token !== expected) throw new NotFoundException();
+
+    // Only hand-relay while there is no wire. The moment SMS_MANUAL_RELAY is
+    // unset (Twilio verified), every message is actually delivered by Twilio,
+    // yet `relayedAt` stays null on all of them — so without this guard the
+    // outbox would list already-sent texts and the operator would re-send them
+    // by hand, doubling every message. When the wire is live, there is nothing
+    // to relay.
+    if (process.env.SMS_MANUAL_RELAY !== '1') {
+      return {
+        pending: 0,
+        messages: [],
+        note: 'Manual relay is off — texts are delivered automatically over SMS. Nothing to hand-carry.',
+      };
+    }
 
     const pending = await this.prisma.message.findMany({
       where: {

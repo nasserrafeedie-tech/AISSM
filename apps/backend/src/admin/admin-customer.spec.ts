@@ -183,4 +183,26 @@ describe('POST /admin/approve', () => {
     assert.equal(res.changed, false);
     assert.match(post.approvalNote, /owner, in person/, 'first approver must not be overwritten');
   });
+
+  it('REFUSES to resurrect a post the owner rejected', async () => {
+    // A mistyped id pointing at a rejected/cancelled post must not be flipped
+    // back to approved — publish-now would then send content the owner killed.
+    post.approvalState = 'rejected';
+    const res: any = await ctrl.approve(TOKEN2, {
+      postId: post.id,
+      approvedBy: 'operator, typo',
+    });
+    assert.equal(res.changed, false);
+    assert.equal(post.approvalState, 'rejected', 'must stay rejected');
+    assert.match(res.reason, /not awaiting/i);
+  });
+
+  it('refuses a post that needs no approval too — only awaiting_owner is approvable', async () => {
+    post.approvalState = 'not_required';
+    const res: any = await ctrl.approve(TOKEN2, {
+      postId: post.id,
+      approvedBy: 'operator',
+    });
+    assert.equal(res.changed, false);
+  });
 });
