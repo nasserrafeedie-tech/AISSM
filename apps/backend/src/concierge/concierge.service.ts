@@ -30,6 +30,7 @@ import {
 import { z } from 'zod';
 import { strategySummary } from './strategy-summary';
 import { OWNER_CONSENT_COPY } from '../operator/graphics/image-prompt';
+import { entitlementLine, upgradePitch } from '../operator/tier-entitlements';
 
 /**
  * Intents that DO something, as opposed to being answered. Only these are
@@ -258,10 +259,15 @@ export class ConciergeService {
 
       case 'upgrade': {
         const site = process.env.PUBLIC_SITE_URL ?? 'https://texthandled.com';
+        const customer = await this.prisma.customer.findUnique({
+          where: { id: customerId },
+          select: { planTier: true },
+        });
         return this.reply(
           phone,
           conversationId,
-          `Happy to bump you up! Growth adds reels cut from your own clips, more posts, and more platforms — upgrade here: ${site}/billing`,
+          `Happy to bump you up! ${upgradePitch(customer?.planTier ?? 'starter')} ` +
+            `Upgrade here: ${site}/billing`,
         );
       }
 
@@ -777,6 +783,10 @@ export class ConciergeService {
       const facts = [
         `Business: ${customer?.businessName ?? 'not named'} — ${profile?.businessType ?? 'unknown'}.`,
         `Plan: ${customer?.planTier}, ${profile?.postingFrequency ?? 3} posts/week.`,
+        // What this plan may and may not offer — so a Starter customer asking
+        // for a carousel is told it's a Growth feature, not promised one the
+        // engine will silently refuse.
+        entitlementLine(customer?.planTier ?? 'starter'),
         pending
           ? `A draft is waiting for their approval (they reply "yes" to schedule it): "${(pending.caption ?? '').slice(0, 120)}"`
           : 'No drafts are waiting on them right now.',
