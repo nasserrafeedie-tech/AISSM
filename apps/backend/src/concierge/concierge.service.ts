@@ -396,6 +396,25 @@ export class ConciergeService {
             regenerate_media: false,
           }),
         );
+        // If the rewrite cleared the post for autopilot (a high-risk draft that
+        // came back low-risk on an auto-publishing plan), REGENERATE_POST leaves
+        // it status='approved' — which nothing schedules, so it would strand
+        // exactly like an auto-drafted post. Enqueue it here, the same way the
+        // weekly rhythm does. On an approval plan the post stays
+        // pending_approval and this is a no-op.
+        const revised = await this.prisma.post.findUnique({
+          where: { id: pending!.id },
+          select: { status: true, scheduledTime: true },
+        });
+        if (revised?.status === 'approved' && revised.scheduledTime) {
+          await this.bus.emit(
+            this.task(customerId, 'SCHEDULE_POST', {
+              post_id: pending!.id,
+              scheduled_time: revised.scheduledTime.toISOString(),
+              owner_approved: false,
+            }),
+          );
+        }
         return this.reply(phone, conversationId, result.summary_for_owner);
       }
 

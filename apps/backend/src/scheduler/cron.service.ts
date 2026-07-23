@@ -108,10 +108,11 @@ export class CronService {
     let drafted = 0;
     for (const slot of slots) {
       try {
+        const scheduledTimeIso = zonedToUtc(slot.date, slot.best_time, tz).toISOString();
         const draft = await this.emit(customerId, 'DRAFT_POST', {
           platform: slot.platform,
           archetype: slot.archetype,
-          scheduled_time: zonedToUtc(slot.date, slot.best_time, tz).toISOString(),
+          scheduled_time: scheduledTimeIso,
           needs_asset: slot.needs_asset,
           shot_list_hint: slot.shot_list,
         });
@@ -138,6 +139,37 @@ export class CronService {
           }).catch((e) =>
             this.log.warn(`image for ${drafted_.post_id} failed: ${e.message}`),
           );
+        }
+
+        // Auto-approved posts must be scheduled here — nothing else does it.
+        // On autopilot (trust auto_low_risk / full_auto) a cleared post is
+        // persisted status='approved', but the publish sweep and reconciler
+        // only ever look at status='scheduled'. Without this step the post
+        // sits 'approved' forever: invisible to publishing, never even marked
+        // failed. We read the post's REAL persisted status rather than the
+        // draft result — a draft the guard forced back to the owner (invented
+        // customer) reports 'done' but is actually pending_approval, and must
+        // NOT be auto-scheduled. Owner-approval posts are scheduled later, when
+        // the owner texts yes; only the ones already cleared for autopilot pass
+        // through here. Runs after media generation so the scheduled post
+        // carries its carousel/image.
+        if (drafted_?.post_id) {
+          const persisted = await this.prisma.post.findUnique({
+            where: { id: drafted_.post_id },
+            select: { status: true },
+          });
+          if (persisted?.status === 'approved') {
+            await this.emit(customerId, 'SCHEDULE_POST', {
+              post_id: drafted_.post_id,
+              scheduled_time: scheduledTimeIso,
+              // System-approved, not owner-approved: don't stamp an owner "yes"
+              // it never gave. The post's approvalState is already
+              // 'not_required', which SCHEDULE_POST accepts.
+              owner_approved: false,
+            }).catch((e) =>
+              this.log.warn(`schedule for ${drafted_.post_id} failed: ${e.message}`),
+            );
+          }
         }
       } catch (e) {
         // One bad draft shouldn't cost the owner their whole week.
