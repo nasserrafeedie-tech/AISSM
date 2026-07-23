@@ -1,4 +1,10 @@
-import { Body, Controller, NotFoundException, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  NotFoundException,
+  Post,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { CronService } from './cron.service';
@@ -12,13 +18,18 @@ const RunWeekBody = z.object({
  * watched end to end without waiting for the cron:
  *
  *   curl -X POST localhost:3001/dev/run-week \
- *     -H 'content-type: application/json' -d '{"from":"+14245550199"}'
+ *     -H 'x-admin-token: ...' -H 'content-type: application/json' \
+ *     -d '{"from":"+14245550199"}'
  *
  * Lives in the scheduler module (not alongside the SMS simulator) because the
  * scheduler already depends on the Concierge — putting it the other way round
  * would make the two modules import each other.
  *
- * Hidden in production unless ALLOW_DEV_SMS=1.
+ * Hidden in production unless ALLOW_DEV_SMS=1 — and even then it demands the
+ * admin token, exactly like /dev/sms. These endpoints trigger real LLM drafting
+ * (run-week burns token budget on demand for any customer by phone) and send
+ * texts, so ALLOW_DEV_SMS alone opening them to anyone is a hole. The flag and
+ * the token were kept in step on /dev/sms; they must stay in step here too.
  */
 @Controller('dev')
 export class DevCronController {
@@ -27,11 +38,23 @@ export class DevCronController {
     private readonly cron: CronService,
   ) {}
 
+  /**
+   * In production: the dev flag must be on AND the admin token must match.
+   * Outside production the endpoints stay open so local dev needs no token.
+   */
+  private assertDevAllowed(token: string | undefined): void {
+    if (process.env.NODE_ENV !== 'production') return;
+    if (process.env.ALLOW_DEV_SMS !== '1') throw new NotFoundException();
+    const expected = process.env.ADMIN_TOKEN;
+    if (!expected || token !== expected) throw new NotFoundException();
+  }
+
   @Post('run-recap')
-  async runRecap(@Body() body: unknown): Promise<{ ok: boolean }> {
-    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_SMS !== '1') {
-      throw new NotFoundException();
-    }
+  async runRecap(
+    @Headers('x-admin-token') token: string | undefined,
+    @Body() body: unknown,
+  ): Promise<{ ok: boolean }> {
+    this.assertDevAllowed(token);
     const { from } = RunWeekBody.parse(body);
     const customer = await this.prisma.customer.findUnique({ where: { phone: from } });
     if (!customer) throw new NotFoundException();
@@ -40,23 +63,19 @@ export class DevCronController {
   }
 
   @Post('flush-texts')
-  async flushTexts(): Promise<{ sent: number }> {
-    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_SMS !== '1') {
-      throw new NotFoundException();
-    }
+  async flushTexts(
+    @Headers('x-admin-token') token: string | undefined,
+  ): Promise<{ sent: number }> {
+    this.assertDevAllowed(token);
     return { sent: await this.cron.flushQueuedTextsNow() };
   }
 
   @Post('run-week')
   async runWeek(
+    @Headers('x-admin-token') token: string | undefined,
     @Body() body: unknown,
   ): Promise<{ drafted: number; texts: string[] }> {
-    if (
-      process.env.NODE_ENV === 'production' &&
-      process.env.ALLOW_DEV_SMS !== '1'
-    ) {
-      throw new NotFoundException();
-    }
+    this.assertDevAllowed(token);
 
     const { from } = RunWeekBody.parse(body);
     const customer = await this.prisma.customer.findUnique({

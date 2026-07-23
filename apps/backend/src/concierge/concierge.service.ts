@@ -459,7 +459,17 @@ export class ConciergeService {
     // anything the owner just asked for — a reply mid-conversation, an upload
     // confirmation, the welcome right after checkout. They're awake; answer.
     const now = new Date();
-    if (!opts?.promptedByOwner && !inTextingWindow(now, customer.timezone)) {
+    // In manual-relay mode there is no wire and no automatic send: a human
+    // decides when each text goes out. Quiet-hours deferral would only bury the
+    // message in QueuedText, which the outbox does not show — so the operator
+    // would never see it. Persist it now so it surfaces in the outbox; the human
+    // already controls the timing.
+    const manualRelay = process.env.SMS_MANUAL_RELAY === '1';
+    if (
+      !opts?.promptedByOwner &&
+      !manualRelay &&
+      !inTextingWindow(now, customer.timezone)
+    ) {
       const sendAfter = nextTextingWindowOpen(now, customer.timezone);
       await this.prisma.queuedText.create({
         data: { customerId, body, sendAfter },
@@ -1113,7 +1123,16 @@ export class ConciergeService {
   }
 
   private isStop(body: string): boolean {
-    return /^\s*(stop|pause|cancel|halt)\b/i.test(body);
+    // The kill switch must be the WHOLE message, not a prefix. The old prefix
+    // match (`\b`) turned "cancel that one" or "pause the promo" — the exact
+    // things an owner types while looking at a draft the prompt invites them to
+    // change — into a full-account pause, shadowing the draft-level cancel
+    // intent entirely. Carrier opt-out compliance only requires the bare
+    // keyword to work, which anchoring preserves; a sentence that merely starts
+    // with one now flows to normal intent handling.
+    return /^\s*(stop|stopall|unsubscribe|end|quit|cancel|pause|halt)\s*[!.]?\s*$/i.test(
+      body,
+    );
   }
 
   private task(

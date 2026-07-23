@@ -55,7 +55,20 @@ export class DevSmsController {
   ): Promise<{ replies: string[] }> {
     this.assertDevAllowed(token);
     const { from, body: text, mediaUrls } = SimBody.parse(body);
-    const t0 = new Date();
+    const phone = normalizePhone(from) ?? from;
+
+    // Snapshot which outbound messages already exist BEFORE handling. Diffing by
+    // id afterwards is immune to clock skew between this process and the DB —
+    // filtering on `createdAt >= t0` (app clock vs Postgres `now()`) silently
+    // drops a reply inserted milliseconds after t0 if the DB clock lags, and the
+    // operator would think the customer got no reply.
+    const before = await this.prisma.customer.findUnique({
+      where: { phone },
+      include: { conversation: { include: { messages: { select: { id: true } } } } },
+    });
+    const seen = new Set(
+      before?.conversation?.messages.map((m) => m.id) ?? [],
+    );
 
     await this.concierge.handleInbound({
       from,
@@ -64,10 +77,8 @@ export class DevSmsController {
       mediaContentTypes: mediaUrls.map(() => 'image/jpeg'),
     });
 
-    // Echo back what the Concierge sent since t0, in order. Look up by the
-    // normalized number, since that is what handleInbound just stored.
     const customer = await this.prisma.customer.findUnique({
-      where: { phone: normalizePhone(from) ?? from },
+      where: { phone },
       include: { conversation: true },
     });
     if (!customer?.conversation) return { replies: [] };
@@ -75,10 +86,14 @@ export class DevSmsController {
       where: {
         conversationId: customer.conversation.id,
         direction: 'outbound',
-        createdAt: { gte: t0 },
       },
       orderBy: { createdAt: 'asc' },
     });
-    return { replies: outbound.map((m) => m.body ?? '') };
+    // Only the ones that did not exist before this call.
+    return {
+      replies: outbound
+        .filter((m) => !seen.has(m.id))
+        .map((m) => m.body ?? ''),
+    };
   }
 }
