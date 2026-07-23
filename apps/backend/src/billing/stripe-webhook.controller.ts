@@ -10,6 +10,7 @@ import {
 import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 import type { Request } from 'express';
 import type { Task } from '@smm/contracts';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskBus } from '../tasks/task-bus.service';
 import { ConciergeService } from '../concierge/concierge.service';
@@ -79,21 +80,32 @@ export class StripeWebhookController {
       return { received: true };
     }
 
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await this.onCheckoutCompleted(event);
-        break;
-      case 'customer.subscription.updated':
-        await this.onSubscriptionUpdated(event);
-        break;
-      case 'invoice.payment_failed':
-        await this.onPaymentFailed(event);
-        break;
-      case 'customer.subscription.deleted':
-        await this.onSubscriptionDeleted(event);
-        break;
-      default:
-        this.log.debug(`ignoring stripe event ${event.type}`);
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed':
+          await this.onCheckoutCompleted(event);
+          break;
+        case 'customer.subscription.updated':
+          await this.onSubscriptionUpdated(event);
+          break;
+        case 'invoice.payment_failed':
+          await this.onPaymentFailed(event);
+          break;
+        case 'customer.subscription.deleted':
+          await this.onSubscriptionDeleted(event);
+          break;
+        default:
+          this.log.debug(`ignoring stripe event ${event.type}`);
+      }
+    } catch (e) {
+      // The handler failed AFTER we claimed the event. If the claim stood, the
+      // claim would make Stripe's retry look like a duplicate and the side
+      // effect — onboarding a paying customer, applying an upgrade, pausing a
+      // deadbeat — would be lost forever. Release the claim so the redelivery
+      // runs it again, then rethrow so Stripe sees a 500 and does retry.
+      // Handlers are written to be safe to re-run (upsert, findFirst-then-set).
+      await this.releaseClaim(event.id);
+      throw e;
     }
     return { received: true };
   }
@@ -119,8 +131,29 @@ export class StripeWebhookController {
         data: { id: event.id, type: event.type },
       });
       return true;
+    } catch (e) {
+      // ONLY a unique-key violation means "already seen" → skip. Any other
+      // error (a connection blip, a pool timeout) is transient: treating it as
+      // a duplicate would drop a brand-new event as if handled. Rethrow those
+      // so Stripe retries instead of losing the event silently.
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        return false;
+      }
+      throw e;
+    }
+  }
+
+  /** Undo a claim when its handler failed, so the retry is honoured. */
+  private async releaseClaim(id: string | undefined): Promise<void> {
+    if (!id) return;
+    try {
+      await this.prisma.stripeWebhookEvent.delete({ where: { id } });
     } catch {
-      return false;
+      // Best-effort. If the delete fails the event stays claimed and the retry
+      // is skipped — no worse than before this method existed, and rare.
     }
   }
 
@@ -351,22 +384,34 @@ export class StripeWebhookController {
     }
     if (!rawBody || !header) return false;
 
-    const parts = Object.fromEntries(
-      header.split(',').map((kv) => kv.split('=') as [string, string]),
-    );
-    const t = parts.t;
-    const v1 = parts.v1;
-    if (!t || !v1) return false;
+    // The header can carry MORE THAN ONE v1 signature — during a webhook-secret
+    // rotation Stripe signs with both the old and new secret. Collect every t
+    // and every v1 rather than keeping just the last, or a valid webhook gets
+    // rejected 403 for the whole rotation window.
+    let t: string | undefined;
+    const sigs: string[] = [];
+    for (const kv of header.split(',')) {
+      const eq = kv.indexOf('=');
+      if (eq < 0) continue;
+      const key = kv.slice(0, eq);
+      const val = kv.slice(eq + 1);
+      if (key === 't') t = val;
+      else if (key === 'v1') sigs.push(val);
+    }
+    if (!t || sigs.length === 0) return false;
     // 5-minute replay window, same tolerance Stripe's own SDK uses.
     if (Math.abs(Date.now() / 1000 - Number(t)) > 300) return false;
 
     const expected = createHmac('sha256', secret)
       .update(`${t}.${rawBody.toString()}`)
       .digest('hex');
-    try {
-      return timingSafeEqual(Buffer.from(expected), Buffer.from(v1));
-    } catch {
-      return false;
-    }
+    const expectedBuf = Buffer.from(expected);
+    return sigs.some((sig) => {
+      try {
+        return timingSafeEqual(expectedBuf, Buffer.from(sig));
+      } catch {
+        return false;
+      }
+    });
   }
 }

@@ -1,5 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { Prisma } from '@prisma/client';
 import { StripeWebhookController } from './stripe-webhook.controller';
 
 /**
@@ -37,9 +38,20 @@ function makeController(rows: Record<string, any>, seen = new Set<string>()) {
     },
     stripeWebhookEvent: {
       create: async ({ data }: any) => {
-        if (seen.has(data.id)) throw new Error('duplicate key');
+        if (seen.has(data.id)) {
+          // Simulate the real unique-key violation Postgres/Prisma raises, so
+          // claim() exercises its P2002 branch rather than a generic Error.
+          throw new Prisma.PrismaClientKnownRequestError('duplicate key', {
+            code: 'P2002',
+            clientVersion: 'test',
+          });
+        }
         seen.add(data.id);
         return data;
+      },
+      delete: async ({ where }: any) => {
+        seen.delete(where.id);
+        return { id: where.id };
       },
     },
   };
@@ -272,5 +284,75 @@ describe('Stripe webhook idempotency', () => {
   it('still processes an event with no id rather than dropping it', async () => {
     const { ctrl } = makeController({});
     assert.equal(await (ctrl as any).claim({ type: 'x' }), true);
+  });
+
+  it('rethrows a TRANSIENT create error instead of dropping the event', async () => {
+    // A connection blip is not a duplicate. Treating it as one would silently
+    // drop a brand-new event; it must propagate so Stripe retries.
+    const prisma = {
+      stripeWebhookEvent: {
+        create: async () => {
+          throw new Error('connection reset'); // not a P2002
+        },
+      },
+    };
+    const ctrl = new StripeWebhookController(prisma as any, {} as any, {} as any);
+    await assert.rejects(() =>
+      (ctrl as any).claim({ id: 'evt_x', type: 'checkout.session.completed' }),
+    );
+  });
+
+  it('releases the claim when the handler throws, so the retry re-runs', async () => {
+    // The core fix: if a handler fails after claiming, the event must NOT stay
+    // marked as seen, or Stripe's retry is skipped and the side effect is lost.
+    const seen = new Set<string>();
+    const prisma = {
+      stripeWebhookEvent: {
+        create: async ({ data }: any) => {
+          if (seen.has(data.id)) {
+            throw new Prisma.PrismaClientKnownRequestError('dup', {
+              code: 'P2002',
+              clientVersion: 'test',
+            });
+          }
+          seen.add(data.id);
+          return data;
+        },
+        delete: async ({ where }: any) => {
+          seen.delete(where.id);
+          return { id: where.id };
+        },
+      },
+      customer: { findFirst: async () => null },
+    };
+    // A concierge whose beginOnboarding throws simulates a downstream failure.
+    const concierge = {
+      beginOnboarding: async () => {
+        throw new Error('SMS provider down');
+      },
+      notify: async () => {},
+    };
+    const ctrl = new StripeWebhookController(
+      prisma as any,
+      { emit: async () => {} } as any,
+      concierge as any,
+    );
+    const event = {
+      id: 'evt_retry',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          customer: 'cus_1',
+          metadata: { plan: 'growth' },
+          customer_details: { phone: '+14244098341' },
+        },
+      },
+    };
+    // First delivery: the handler throws, and handle() rethrows (→ Stripe 500).
+    await assert.rejects(() =>
+      (ctrl as any).handle({ rawBody: Buffer.from(JSON.stringify(event)) }, undefined),
+    );
+    // The claim must have been released — otherwise the id is still in `seen`.
+    assert.equal(seen.has('evt_retry'), false, 'claim must be released on failure');
   });
 });
