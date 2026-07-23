@@ -13,6 +13,7 @@ import type { Task } from '@smm/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskBus } from '../tasks/task-bus.service';
 import { ConciergeService } from '../concierge/concierge.service';
+import { normalizePhone } from '../common/phone';
 
 interface StripeEvent {
   type: string;
@@ -72,8 +73,23 @@ export class StripeWebhookController {
   /** Payment landed → create the customer and open the conversation. */
   private async onCheckoutCompleted(event: StripeEvent): Promise<void> {
     const obj = event.data.object;
-    const phone = obj.customer_details?.phone;
+    // Normalize before anything touches the database. Phone IS the account key,
+    // and Stripe's formatting is not ours to assume — a customer who already
+    // exists (signed up in person, connected their Instagram, mid-onboarding)
+    // must resolve to that same row. Upserting on a raw string instead creates a
+    // SECOND customer: the new one holds the plan they just paid for, the
+    // original holds their connected account and brand profile, and neither is
+    // whole. Every other way into this table normalizes; so does this one.
+    const rawPhone = obj.customer_details?.phone;
+    const phone = normalizePhone(rawPhone);
     const plan = obj.metadata?.plan ?? 'starter';
+    if (rawPhone && !phone) {
+      this.log.error(
+        `checkout.session.completed with an unusable phone "${rawPhone}" — ` +
+          'refusing to create a customer we cannot text or match',
+      );
+      return;
+    }
     if (!phone) {
       // Phone collection is enabled on our sessions, so this is a config
       // regression worth shouting about — it means a paying customer we
