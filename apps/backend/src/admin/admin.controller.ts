@@ -38,6 +38,18 @@ const UpsertCustomerBody = z.object({
   planTier: z.enum(['starter', 'growth', 'pro']).optional(),
   timezone: z.string().min(1).optional(),
   status: z.enum(['active', 'paused', 'cancelled']).optional(),
+  // Consent to generated photography. Off by default (the owner's decision); set
+  // here to turn a customer's carousel covers into generated hero images.
+  aiImagesOptIn: z.boolean().optional(),
+});
+
+const MakeCarouselBody = z.object({
+  customerId: z.string().uuid(),
+  caption: z.string().min(10),
+  platform: z.enum(['instagram', 'facebook', 'tiktok', 'threads']).default('instagram'),
+  archetype: z
+    .enum(['educational_tip', 'product_spotlight', 'promo', 'testimonial', 'seasonal'])
+    .default('educational_tip'),
 });
 
 /**
@@ -161,6 +173,79 @@ export class AdminController {
       // a different host than the one the concierge texts them.
       connectLink: `${process.env.PUBLIC_SITE_URL ?? 'https://texthandled.com'}/connect?c=${customer.id}`,
       note: tierNote(customer.planTier),
+    };
+  }
+
+  /**
+   * Build a carousel on demand for one customer — an operator trigger for a test
+   * post, or a one-off. Creates a post from the caption, marks it moderation-
+   * passed and approved, then runs GENERATE_CAROUSEL. If the customer has AI
+   * images on, the cover gets a generated hero (which forces the post back to
+   * awaiting_owner — approve it before publishing). Returns the post id to
+   * publish with /admin/publish-now.
+   */
+  @HttpPost('make-carousel')
+  async makeCarousel(
+    @Headers('x-admin-token') token: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const expected = process.env.ADMIN_TOKEN;
+    if (!expected || token !== expected) throw new NotFoundException();
+
+    const parsed = MakeCarouselBody.safeParse(body);
+    if (!parsed.success) {
+      return { error: 'bad_request', detail: parsed.error.issues };
+    }
+    const { customerId, caption, platform, archetype } = parsed.data;
+
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { planTier: true },
+    });
+    if (!customer) throw new NotFoundException(`no customer ${customerId}`);
+    if (!tierHasCarousel(customer.planTier)) {
+      return { error: 'tier', detail: `planTier ${customer.planTier} has no carousels — set growth or pro` };
+    }
+
+    const post = await this.prisma.post.create({
+      data: {
+        customerId,
+        archetype,
+        platform,
+        caption,
+        // Operator-created and trusted: cleared to publish once the slides land.
+        // If a generated hero is added, GENERATE_CAROUSEL flips this back to
+        // awaiting_owner, so an AI-image carousel still gets a human yes.
+        status: 'approved',
+        approvalState: 'approved',
+        moderationState: 'passed',
+      },
+    });
+
+    const result = await this.bus.emit({
+      task_id: randomUUID(),
+      customer_id: customerId,
+      type: 'GENERATE_CAROUSEL',
+      payload: { post_id: post.id },
+      requires_approval: false,
+      created_by: 'concierge',
+      created_at: new Date().toISOString(),
+    } as never);
+
+    const refreshed = await this.prisma.post.findUnique({
+      where: { id: post.id },
+      select: { mediaRefs: true, aiGeneratedMedia: true, approvalState: true },
+    });
+    return {
+      postId: post.id,
+      slides: refreshed?.mediaRefs.length ?? 0,
+      aiHero: refreshed?.aiGeneratedMedia ?? false,
+      approvalState: refreshed?.approvalState,
+      generation: result.summary_for_owner,
+      next:
+        refreshed?.approvalState === 'awaiting_owner'
+          ? `Review it, then POST /admin/approve then /admin/publish-now for ${post.id}.`
+          : `POST /admin/publish-now with {"postId":"${post.id}"} to send it.`,
     };
   }
 
