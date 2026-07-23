@@ -6,9 +6,9 @@ import { type Task, type Result, type MakeGraphicResult } from '@smm/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GraphicsService } from '../graphics/graphics.service';
 import { CANVAS, stableSeed, type BrandTheme, type SlideSpec } from '../graphics/slide-templates';
+import { resolveBrandColors } from '../graphics/brand-palette';
 import { TaskHandler, ok, fail } from './handler.interface';
 import { StorageService } from '../../common/storage.service';
-import { toSvgColors } from '../graphics/color.util';
 
 /**
  * MAKE_GRAPHIC (§7). Render text slides / carousels to crisp PNGs (SVG→PNG, no
@@ -36,9 +36,12 @@ export class MakeGraphicHandler implements TaskHandler<'MAKE_GRAPHIC'> {
       }),
     ]);
 
+    // Real brand colors if we have them, else a stable palette distinct to this
+    // business (not the one shared default). See brand-palette.ts.
+    const pal = resolveBrandColors(profile?.brandColors, task.customer_id);
     const theme: BrandTheme = {
-      primary: toSvgColors(profile?.brandColors ?? [])[0] ?? '#2C3E50',
-      secondary: toSvgColors(profile?.brandColors ?? [])[1],
+      primary: pal.primary,
+      secondary: pal.secondary,
       // The trading name, not the rambling sentence the owner typed at signup.
       brandName: customer?.businessName ?? undefined,
       style: (profile?.visualStyle as BrandTheme['style']) ?? undefined,

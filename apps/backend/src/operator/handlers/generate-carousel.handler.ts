@@ -6,7 +6,7 @@ import { StorageService } from '../../common/storage.service';
 import { LlmService } from '../llm/llm.service';
 import { GraphicsService } from '../graphics/graphics.service';
 import { CANVAS, stableSeed, type BrandTheme, type SlideSpec } from '../graphics/slide-templates';
-import { toSvgColors } from '../graphics/color.util';
+import { resolveBrandColors } from '../graphics/brand-palette';
 import {
   carouselInstruction,
   CarouselLlmOutput,
@@ -98,9 +98,13 @@ export class GenerateCarouselHandler implements TaskHandler<'GENERATE_CAROUSEL'>
         'carousel_copy_failed', String(e), true);
     }
 
+    // Real brand colors if we have them, else a stable palette distinct to this
+    // business — never the one shared default that made colorless feeds look
+    // alike. Seeded off the same customer id as the design rotation.
+    const pal = resolveBrandColors(profile?.brandColors, task.customer_id);
     const theme: BrandTheme = {
-      primary: toSvgColors(profile?.brandColors ?? [])[0] ?? '#2C3E50',
-      secondary: toSvgColors(profile?.brandColors ?? [])[1],
+      primary: pal.primary,
+      secondary: pal.secondary,
       brandName: customer?.businessName ?? undefined,
       style: (profile?.visualStyle as BrandTheme['style']) ?? undefined,
     };
