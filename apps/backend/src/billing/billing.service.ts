@@ -73,6 +73,13 @@ export class BillingService {
     // revenue is large enough that getting this wrong costs more than the
     // half hour it takes to set product tax codes and delete this line.
     form.set('managed_payments[enabled]', 'false');
+    // With Managed Payments off, Stripe no longer picks payment methods for us,
+    // and a new account has none explicitly activated — so it refuses the
+    // session for having nothing to charge. Naming `card` outright is what we
+    // want regardless: a monthly subscription needs a card on file it can
+    // re-charge, and leaving the choice to account defaults means a dashboard
+    // toggle somewhere can silently change how customers pay us.
+    form.set('payment_method_types[0]', 'card');
     // The phone number IS the account (§2) — without it the webhook can't
     // start the SMS relationship. The plan rides along as metadata.
     form.set('phone_number_collection[enabled]', 'true');
