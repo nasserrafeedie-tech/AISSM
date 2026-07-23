@@ -8,6 +8,18 @@ import { GraphicsService } from '../graphics/graphics.service';
 import { CANVAS, stableSeed, type BrandTheme, type SlideSpec } from '../graphics/slide-templates';
 import { resolveBrandColors } from '../graphics/brand-palette';
 import { logoDataUri } from '../graphics/logo-colors';
+import { ImageGenService } from '../graphics/image-gen.service';
+import { ImageSafetyService } from '../graphics/image-safety.service';
+import {
+  buildImagePrompt,
+  shouldRefuseSubject,
+  stripOwnershipClaims,
+  subjectInstruction,
+  type ImageBrief,
+} from '../graphics/image-prompt';
+import { z } from 'zod';
+
+const HeroSubject = z.object({ subject: z.string().min(1).max(120) });
 import {
   carouselInstruction,
   CarouselLlmOutput,
@@ -37,13 +49,53 @@ export class GenerateCarouselHandler implements TaskHandler<'GENERATE_CAROUSEL'>
     private readonly llm: LlmService,
     private readonly graphics: GraphicsService,
     private readonly storage: StorageService,
+    private readonly images: ImageGenService,
+    private readonly safety: ImageSafetyService,
   ) {}
+
+  /**
+   * A generated hero photo for the carousel's cover slide — the same guarded
+   * pipeline the standalone image handler uses: pick a subject, refuse a place
+   * or a specific business, build the constrained prompt, generate, then look at
+   * the actual pixels and reject a fabricated place. Returns a data URI to
+   * composite behind the cover headline, or null when any step declines — a
+   * missing hero is a plain-text cover, never a failed carousel.
+   */
+  private async generateHeroImage(
+    customerId: string,
+    businessType: string,
+    caption: string,
+  ): Promise<string | null> {
+    if (!this.images.configured) return null;
+    try {
+      const brief: ImageBrief = { businessType, caption: caption.slice(0, 200) };
+      const picked = await this.llm.completeJson(
+        { tier: 'bulk', cachedContext: '', prompt: subjectInstruction(brief), maxTokens: 120, customerId },
+        HeroSubject,
+      );
+      const cleaned = stripOwnershipClaims(picked.subject.trim());
+      if (!cleaned || shouldRefuseSubject(cleaned)) {
+        this.log.warn(`hero subject refused for ${customerId}: "${picked.subject}"`);
+        return null;
+      }
+      const image = await this.images.generate(buildImagePrompt(brief, cleaned), { aspect: '1:1' });
+      const verdict = await this.safety.isPlace(image.bytes, image.contentType);
+      if (verdict.isPlace) {
+        this.log.warn(`hero image discarded for ${customerId}: depicts a place (${verdict.reason})`);
+        return null;
+      }
+      return `data:${image.contentType};base64,${image.bytes.toString('base64')}`;
+    } catch (e) {
+      this.log.warn(`hero image generation failed for ${customerId}: ${String(e)}`);
+      return null;
+    }
+  }
 
   async handle(task: Extract<Task, { type: 'GENERATE_CAROUSEL' }>): Promise<Result> {
     const [customer, profile, post] = await Promise.all([
       this.prisma.customer.findUnique({
         where: { id: task.customer_id },
-        select: { businessName: true, planTier: true },
+        select: { businessName: true, planTier: true, aiImagesOptIn: true },
       }),
       this.prisma.brandProfile.findUnique({ where: { customerId: task.customer_id } }),
       this.prisma.post.findUnique({ where: { id: task.payload.post_id } }),
@@ -139,6 +191,24 @@ export class GenerateCarouselHandler implements TaskHandler<'GENERATE_CAROUSEL'>
       variant: i,
     }));
 
+    // If the owner opted into generated photography, give the COVER slide a
+    // generated hero image with its headline over it — a mix of a real photo
+    // treatment and text slides, not five text cards. Opt-in only, and additive:
+    // without consent (the default) the carousel is unchanged. A place-image or
+    // any failure falls back to the plain-text cover, never a failed carousel.
+    let usedAiImage = false;
+    if (customer.aiImagesOptIn && specs.length > 0) {
+      const hero = await this.generateHeroImage(
+        task.customer_id,
+        profile?.businessType ?? 'local business',
+        post.caption,
+      );
+      if (hero) {
+        specs[0] = { ...specs[0], photo: hero, photoLayout: 'full' };
+        usedAiImage = true;
+      }
+    }
+
     let pngs: Buffer[];
     try {
       pngs = this.graphics.renderCarousel(specs, theme);
@@ -168,16 +238,26 @@ export class GenerateCarouselHandler implements TaskHandler<'GENERATE_CAROUSEL'>
       refs.push(r2Key);
     }
 
-    // Attach the slides in order. Approval state is left as the draft handler
-    // set it: a carousel is a faithful re-rendering of a caption that already
-    // cleared the trust gate, not a new claim like a fabricated photo — so a
-    // trusted customer's post still auto-publishes with its slides on it.
+    // Attach the slides in order. Approval state is normally left as the draft
+    // handler set it — a carousel is a faithful re-rendering of a caption that
+    // already cleared the trust gate. BUT a generated hero photo IS a new claim,
+    // like any AI image: it is disclosed at publish (aiGeneratedMedia) and forced
+    // back to the owner's eyes regardless of trust, exactly as the standalone
+    // image handler does.
     await this.prisma.post.update({
       where: { id: post.id },
-      data: { mediaRefs: refs },
+      data: {
+        mediaRefs: refs,
+        ...(usedAiImage
+          ? { aiGeneratedMedia: true, approvalState: 'awaiting_owner' as const }
+          : {}),
+      },
     });
 
-    this.log.log(`built a ${refs.length}-slide carousel for post ${post.id}`);
+    this.log.log(
+      `built a ${refs.length}-slide carousel for post ${post.id}` +
+        (usedAiImage ? ' (with a generated hero image)' : ''),
+    );
     return ok(task.task_id,
       `I turned this one into a ${refs.length}-slide carousel — have a look.`,
       'done',
