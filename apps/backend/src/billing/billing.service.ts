@@ -62,6 +62,17 @@ export class BillingService {
     form.set('success_url', `${siteUrl}/billing?status=success`);
     form.set('cancel_url', `${siteUrl}/billing?status=cancelled`);
     form.set('allow_promotion_codes', 'true');
+    // Managed Payments is on by default on new Stripe accounts. It makes Stripe
+    // the merchant of record and handles sales tax — but it refuses to create a
+    // session until every product carries a tax code, which ours do not.
+    //
+    // Turned off here rather than tagging the products, so that sales tax stays
+    // our responsibility. That is the right trade only while the tax picture is
+    // simple: advertising and marketing services are untaxed in most US states,
+    // and we sell to one state today. Revisit when we sell across state lines or
+    // revenue is large enough that getting this wrong costs more than the
+    // half hour it takes to set product tax codes and delete this line.
+    form.set('managed_payments[enabled]', 'false');
     // The phone number IS the account (§2) — without it the webhook can't
     // start the SMS relationship. The plan rides along as metadata.
     form.set('phone_number_collection[enabled]', 'true');
