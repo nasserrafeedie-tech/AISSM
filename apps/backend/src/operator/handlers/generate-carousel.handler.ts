@@ -7,6 +7,7 @@ import { LlmService } from '../llm/llm.service';
 import { GraphicsService } from '../graphics/graphics.service';
 import { CANVAS, stableSeed, type BrandTheme, type SlideSpec } from '../graphics/slide-templates';
 import { resolveBrandColors } from '../graphics/brand-palette';
+import { logoDataUri } from '../graphics/logo-colors';
 import {
   carouselInstruction,
   CarouselLlmOutput,
@@ -102,11 +103,19 @@ export class GenerateCarouselHandler implements TaskHandler<'GENERATE_CAROUSEL'>
     // business — never the one shared default that made colorless feeds look
     // alike. Seeded off the same customer id as the design rotation.
     const pal = resolveBrandColors(profile?.brandColors, task.customer_id);
+    // The real logo, composited onto each slide's footer when we have one. A
+    // missing/unreadable logo degrades to no logo — never fails the render.
+    let logo: string | undefined;
+    if (profile?.logoRef) {
+      const bytes = await this.storage.get(profile.logoRef);
+      if (bytes) logo = logoDataUri(bytes, profile.logoRef.split('.').pop() ?? 'png');
+    }
     const theme: BrandTheme = {
       primary: pal.primary,
       secondary: pal.secondary,
       brandName: customer?.businessName ?? undefined,
       style: (profile?.visualStyle as BrandTheme['style']) ?? undefined,
+      logoDataUri: logo,
     };
 
     // One seed for the whole carousel: every slide shares a surface and palette,

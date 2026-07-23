@@ -13,6 +13,7 @@ type Phase = 'pick' | 'uploading' | 'done' | 'error';
 export default function UploadPage() {
   const api = process.env.NEXT_PUBLIC_API_URL;
   const [customer, setCustomer] = useState<string | null>(null);
+  const [isLogo, setIsLogo] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [phase, setPhase] = useState<Phase>('pick');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -20,6 +21,9 @@ export default function UploadPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setCustomer(params.get('c') ?? params.get('customer'));
+    // Logo mode: same uploader, tagged so the backend stores it as the brand
+    // logo (and pulls colours from it) instead of a post photo.
+    setIsLogo(params.get('kind') === 'logo' || params.get('logo') === '1');
   }, []);
 
   async function send() {
@@ -29,7 +33,8 @@ export default function UploadPage() {
       const form = new FormData();
       files.forEach((f) => form.append('files', f));
       const res = await fetch(
-        `${api}/uploads?customer=${encodeURIComponent(customer)}`,
+        `${api}/uploads?customer=${encodeURIComponent(customer)}` +
+          (isLogo ? '&kind=logo' : ''),
         { method: 'POST', body: form },
       );
       if (!res.ok) throw new Error(String(res.status));
@@ -45,13 +50,20 @@ export default function UploadPage() {
     <main className="bg-warm-radial">
       <div className="mx-auto flex max-w-lg flex-col gap-8 px-6 pb-28 pt-14 sm:pt-20">
         <div>
-          <p className="eyebrow mb-5 animate-fade-in">✳ Send your clips</p>
+          <p className="eyebrow mb-5 animate-fade-in">
+            {isLogo ? '✳ Send your logo' : '✳ Send your clips'}
+          </p>
           <h1 className="font-display text-[clamp(2.2rem,8vw,3.2rem)] font-semibold leading-[1.03] tracking-tight">
-            Film it. <span className="wonk italic text-clay-600">We’ll cut it.</span>
+            {isLogo ? (
+              <>Your logo. <span className="wonk italic text-clay-600">On every post.</span></>
+            ) : (
+              <>Film it. <span className="wonk italic text-clay-600">We’ll cut it.</span></>
+            )}
           </h1>
           <p className="mt-4 text-ink/60">
-            Pick 2–5 short videos (5–10 seconds each) straight from your camera
-            roll. Don’t overthink it — real beats perfect.
+            {isLogo
+              ? 'Upload your logo (PNG or JPG). We’ll put it on your posts and pull your brand colours from it — a clear one is best.'
+              : 'Pick 2–5 short videos (5–10 seconds each) straight from your camera roll. Don’t overthink it — real beats perfect.'}
           </p>
         </div>
 

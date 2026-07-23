@@ -65,6 +65,13 @@ export interface BrandTheme {
   brandName?: string;
   /** Type personality. Defaults to 'modern'. */
   style?: BrandStyle;
+  /**
+   * The business's real logo, as a `data:image/...;base64,...` URI. When set, a
+   * word slide shows the logo badge in place of the text brand-name footer — the
+   * real mark, composited, never generated. The handler base64-encodes the file
+   * fetched from storage; the renderer stays pure.
+   */
+  logoDataUri?: string;
 }
 
 export interface SlideSpec {
@@ -698,6 +705,32 @@ function footerLeft(text: string, x: number, p: Palette, t: TypeSet): string {
   `;
 }
 
+/**
+ * The real logo, composited into the footer as a small badge.
+ *
+ * On a white chip on purpose: a logo can be any colour on any background, and a
+ * dark logo (the common case for small businesses) would vanish on a dark or
+ * brand-coloured surface. A clean white chip guarantees it reads everywhere and
+ * looks intentional — a sticker, not a floating cut-out. `preserveAspectRatio`
+ * = meet fits ANY logo shape into the box without distortion, so we never need
+ * the logo's dimensions. (Limitation: a white/pale logo on its own transparent
+ * background will read faintly on the white chip — rare, and better than a dark
+ * logo vanishing on a dark slide. A luminance-aware chip colour is a later
+ * refinement.)
+ */
+function logoBadge(dataUri: string, centered: boolean, pad: number): string {
+  const chipW = 190;
+  const chipH = 66;
+  const y = CANVAS - 92 - chipH / 2;
+  const x = centered ? CANVAS / 2 - chipW / 2 : pad;
+  const inset = 12;
+  return `
+    <g>
+      <rect x="${x}" y="${y}" width="${chipW}" height="${chipH}" rx="14" fill="#FFFFFF" stroke="#1A140D" stroke-opacity="0.08" stroke-width="1"/>
+      <image x="${x + inset}" y="${y + inset}" width="${chipW - inset * 2}" height="${chipH - inset * 2}" href="${dataUri}" preserveAspectRatio="xMidYMid meet"/>
+    </g>`;
+}
+
 /** A pill-shaped call-to-action button with a cleanly drawn arrow. */
 function ctaButton(cx: number, cy: number, label: string, p: Palette, t: TypeSet): string {
   const fs = 30;
@@ -992,8 +1025,15 @@ export function renderSlideSvg(spec: SlideSpec, theme: BrandTheme): string {
   if (cardBox) parts.push(cardPanel(p, cardBox.y, cardBox.h));
   parts.push(stack(blocks, zoneTop, zoneBottom));
 
-  // Pinned footer, only where there's room for one below the design.
-  if (!footerInStack && footer && !eyebrowIsBrand && spec.kind !== 'quote') {
+  // Footer. A real logo, when we have one, is composited as a badge on word
+  // slides (the surface layouts) — the actual brand mark instead of the text
+  // name. It shows even on title/body slides where the text footer is skipped
+  // as redundant with the eyebrow, because a logo is not redundant with a word.
+  // Photo layouts (band/card) keep their in-stack text footer untouched.
+  if (theme.logoDataUri && !layout) {
+    parts.push(logoBadge(theme.logoDataUri, centered, pad));
+  } else if (!footerInStack && footer && !eyebrowIsBrand && spec.kind !== 'quote') {
+    // Pinned footer, only where there's room for one below the design.
     parts.push(
       centered ? footerCentered(footer, p, t) : footerLeft(footer, pad, p, t),
     );

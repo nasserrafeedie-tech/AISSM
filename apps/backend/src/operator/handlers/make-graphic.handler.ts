@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { GraphicsService } from '../graphics/graphics.service';
 import { CANVAS, stableSeed, type BrandTheme, type SlideSpec } from '../graphics/slide-templates';
 import { resolveBrandColors } from '../graphics/brand-palette';
+import { logoDataUri } from '../graphics/logo-colors';
 import { TaskHandler, ok, fail } from './handler.interface';
 import { StorageService } from '../../common/storage.service';
 
@@ -39,12 +40,18 @@ export class MakeGraphicHandler implements TaskHandler<'MAKE_GRAPHIC'> {
     // Real brand colors if we have them, else a stable palette distinct to this
     // business (not the one shared default). See brand-palette.ts.
     const pal = resolveBrandColors(profile?.brandColors, task.customer_id);
+    let logo: string | undefined;
+    if (profile?.logoRef) {
+      const bytes = await this.storage.get(profile.logoRef);
+      if (bytes) logo = logoDataUri(bytes, profile.logoRef.split('.').pop() ?? 'png');
+    }
     const theme: BrandTheme = {
       primary: pal.primary,
       secondary: pal.secondary,
       // The trading name, not the rambling sentence the owner typed at signup.
       brandName: customer?.businessName ?? undefined,
       style: (profile?.visualStyle as BrandTheme['style']) ?? undefined,
+      logoDataUri: logo,
     };
 
     // One seed for the whole set, rotated per post so this brand's own feed has

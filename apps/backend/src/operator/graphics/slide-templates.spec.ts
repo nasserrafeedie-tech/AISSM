@@ -131,3 +131,39 @@ describe('two different businesses should not share a look', () => {
     assert.ok(surfaces.size >= 5, 'a brand walking its own post counts still varies');
   });
 });
+
+/**
+ * Logo compositing: a real logo, when present, replaces the text brand footer
+ * on WORD slides — the actual mark, not a generated one.
+ */
+describe('logo compositing', () => {
+  const withLogo = (over: Partial<SlideSpec> = {}) =>
+    renderSlideSvg(slide(over), {
+      ...theme,
+      logoDataUri: 'data:image/png;base64,AAAA',
+    });
+
+  it('composites the logo as an <image> badge on a word slide', () => {
+    const svg = withLogo({ seed: 0, variant: 0 });
+    assert.match(svg, /<image[^>]+href="data:image\/png;base64,AAAA"/);
+    assert.match(svg, /preserveAspectRatio="xMidYMid meet"/);
+  });
+
+  it('shows the logo even on a title slide (not redundant with the eyebrow)', () => {
+    const svg = withLogo({ kind: 'title', seed: 2, variant: 0 });
+    assert.match(svg, /href="data:image\/png;base64,AAAA"/);
+  });
+
+  it('does NOT composite the logo onto a photo slide', () => {
+    const svg = renderSlideSvg(
+      slide({ photo: 'data:image/png;base64,PHOTO', kind: 'title' }),
+      { ...theme, logoDataUri: 'data:image/png;base64,AAAA' },
+    );
+    assert.doesNotMatch(svg, /href="data:image\/png;base64,AAAA"/);
+  });
+
+  it('without a logo, no logo image appears', () => {
+    const svg = renderSlideSvg(slide({ seed: 0 }), theme);
+    assert.doesNotMatch(svg, /<image/);
+  });
+});

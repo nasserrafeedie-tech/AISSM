@@ -59,6 +59,39 @@ export class StorageService {
     }
   }
 
+  /**
+   * Read bytes back for a stored key — used to composite a stored logo into a
+   * slide. Reads the local copy (always written by `put`) and falls back to R2
+   * when the local file isn't present (e.g. a fresh dyno that never wrote it).
+   * Returns null rather than throwing: a missing logo must degrade to no logo,
+   * never fail the whole render.
+   */
+  async get(key: string): Promise<Buffer | null> {
+    const { readFileSync, existsSync } = require('node:fs') as typeof import('node:fs');
+    const path = join(this.mediaDir, key);
+    if (existsSync(path)) {
+      try {
+        return readFileSync(path);
+      } catch {
+        /* fall through to R2 */
+      }
+    }
+    const client = this.r2();
+    if (!client) return null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { GetObjectCommand } = require('@aws-sdk/client-s3');
+      const res: any = await client.send(
+        new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }),
+      );
+      const bytes = await res.Body?.transformToByteArray?.();
+      return bytes ? Buffer.from(bytes) : null;
+    } catch (err) {
+      this.log.warn(`R2 get failed for ${key}: ${String(err)}`);
+      return null;
+    }
+  }
+
   /** Public URL for a stored key (R2 public base preferred). */
   publicUrl(key: string): string {
     const r2base = process.env.R2_PUBLIC_BASE_URL?.replace(/\/+$/, '');

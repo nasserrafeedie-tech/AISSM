@@ -18,6 +18,7 @@ import { TaskBus } from '../tasks/task-bus.service';
 import { ConciergeService } from '../concierge/concierge.service';
 import { detectMedia } from '../common/media-type';
 import { StorageService } from '../common/storage.service';
+import { extractBrandColors } from '../operator/graphics/logo-colors';
 
 interface UploadedFileShape {
   originalname: string;
@@ -52,11 +53,14 @@ export class UploadsController {
   async upload(
     @Query('customer') customerId: string | undefined,
     @UploadedFiles() files: UploadedFileShape[],
+    @Query('kind') kind?: string,
   ): Promise<{ stored: number; kinds: string[] }> {
     if (!customerId) throw new BadRequestException('missing customer');
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
     if (!customer) throw new NotFoundException('unknown customer');
     if (!files?.length) throw new BadRequestException('no files');
+
+    if (kind === 'logo') return this.handleLogo(customerId, files[0]);
 
     const mediaDir = process.env.MEDIA_DIR ?? join(__dirname, '..', '..', 'media');
     const kinds: string[] = [];
@@ -109,6 +113,65 @@ export class UploadsController {
     }
 
     return { stored: files.length, kinds };
+  }
+
+  /**
+   * A logo is not a post photo. It is stored ONLY as brandProfile.logoRef — never
+   * as a MediaAsset — because a MediaAsset with source owner_upload would get
+   * picked up as a banked photo and land on an actual post. From the logo we pull
+   * the brand colours (best source we have) and confirm back so the owner can
+   * correct us; a wrong colour on every post is worse than asking.
+   */
+  private async handleLogo(
+    customerId: string,
+    file: UploadedFileShape,
+  ): Promise<{ stored: number; kinds: string[] }> {
+    const detected = detectMedia(file.buffer);
+    if (!detected || detected.kind !== 'image') {
+      throw new BadRequestException(
+        'That doesn\'t look like a logo image — send a PNG or JPG of your logo.',
+      );
+    }
+    const r2Key = `${customerId}/logo.${detected.ext}`;
+    await this.storage.put(r2Key, file.buffer, detected.contentType);
+
+    // Extract colours before writing, so a black-and-white logo (which yields
+    // nothing) doesn't wipe colours the owner may have already stated in words.
+    const colors = await extractBrandColors(file.buffer);
+    const existing = await this.prisma.brandProfile.findUnique({
+      where: { customerId },
+      select: { brandColors: true },
+    });
+    const extracted = [colors.primary, colors.secondary].filter(
+      (c): c is string => Boolean(c),
+    );
+    // Fill brand colours from the logo only when we don't already have the
+    // owner's own words — an explicit "we're teal" is more intentional than an
+    // extraction, and the logo is still stored either way.
+    const takeColors = extracted.length > 0 && !(existing?.brandColors?.length);
+
+    await this.prisma.brandProfile.update({
+      where: { customerId },
+      data: {
+        logoRef: r2Key,
+        ...(takeColors ? { brandColors: extracted } : {}),
+      },
+    });
+
+    const msg = takeColors
+      ? 'Got your logo — I pulled your brand colours from it and your carousels ' +
+        'will use them from now on. 🎨 If they look off, just tell me your ' +
+        'colours (like "we\'re teal and gold").'
+      : extracted.length > 0
+        ? 'Got your logo, thanks! I\'ll keep the colours you already gave me.'
+        : 'Got your logo! I couldn\'t read clear brand colours from it — if you ' +
+          'tell me your colours (like "we\'re teal and gold") I\'ll use those.';
+    void this.concierge.notify(customerId, msg, { promptedByOwner: true });
+
+    this.log.log(
+      `logo stored for ${customerId}; colours ${takeColors ? extracted.join('+') : 'not taken'}`,
+    );
+    return { stored: 1, kinds: ['logo'] };
   }
 
   private async assembleAndNotify(customerId: string): Promise<void> {

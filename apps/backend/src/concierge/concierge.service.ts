@@ -985,6 +985,11 @@ export class ConciergeService {
       `Next, whenever you have two minutes: connect the accounts you want ` +
         `me to post to (secure link, we never see your passwords): ` +
         `${site}/connect?c=${customerId}\n\n` +
+        // Optional, never a gate. A logo lets us brand every post and pull the
+        // real colours — but a signup should never stall on finding a logo file,
+        // so it's an offer, and the colour fallback covers everyone who skips.
+        `Got a logo handy? Drop it here and I'll put it on your posts: ` +
+        `${site}/upload?c=${customerId}&kind=logo\n\n` +
         `Meanwhile I'm writing your first week — give me a moment.`,
     );
 
