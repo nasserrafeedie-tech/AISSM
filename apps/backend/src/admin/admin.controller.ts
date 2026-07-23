@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   NotFoundException,
+  Header,
   Post as HttpPost,
   Query,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import { BusinessMetricsService } from './business-metrics.service';
 import { PostForMeService } from '../operator/publishing/post-for-me.service';
 import { normalizePhone } from '../common/phone';
 import { tierHasCarousel } from '../operator/graphics/carousel-content';
+import { ADMIN_PAGE_HTML } from './admin-page';
 
 const PublishNowBody = z.object({ postId: z.string().uuid() });
 
@@ -86,6 +88,18 @@ export class AdminController {
     private readonly metrics: BusinessMetricsService,
     private readonly pfm: PostForMeService,
   ) {}
+
+  /**
+   * The operator's page. Served WITHOUT a token on purpose: this is an empty
+   * shell containing no business data, so the URL is safe to bookmark. It asks
+   * for the token in the browser and sends it as a header on every fetch — the
+   * same gate every endpoint below already enforces.
+   */
+  @Get()
+  @Header('content-type', 'text/html; charset=utf-8')
+  page(): string {
+    return ADMIN_PAGE_HTML;
+  }
 
   /**
    * Create or update a customer by hand — the founder-run signup path.
