@@ -1,0 +1,14 @@
+-- Add Google Business Profile to the Platform enum.
+--
+-- For a local shop the Google Business Profile is the highest-value channel —
+-- it is what shows in Maps and Search — so it joins the platforms we publish to.
+-- Unlike the others it does not route through Post for Me (which has no Google
+-- support); it is a direct Google integration with its own OAuth. Downstream,
+-- everything treats it as one more platform: a post target, a connected account,
+-- a slot against the tier's platform allowance.
+--
+-- Adding a value is a simple in-place ALTER (unlike the removal in
+-- 20260722_trim_platforms, which had to rebuild the type). ADD VALUE cannot run
+-- inside a transaction block, so this migration is intentionally a single
+-- statement with no BEGIN/COMMIT.
+ALTER TYPE "Platform" ADD VALUE IF NOT EXISTS 'google_business';

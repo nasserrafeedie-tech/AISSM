@@ -3,6 +3,9 @@ import type { Platform } from '@smm/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { TokenCryptoService } from '../operator/security/token-crypto.service';
 import { PostForMeService } from '../operator/publishing/post-for-me.service';
+import { GoogleBusinessService } from '../operator/publishing/google-business.service';
+import { canConnectPlatform, platformLimit } from '../operator/tier-entitlements';
+import { platformName } from '../operator/publishing/platform-names';
 
 export interface StartAuthRequest {
   customerId: string;
@@ -40,14 +43,64 @@ export class ConnectService {
     private readonly prisma: PrismaService,
     private readonly crypto: TokenCryptoService,
     private readonly pfm: PostForMeService,
+    private readonly google: GoogleBusinessService,
   ) {}
 
   private get siteUrl(): string {
     return process.env.PUBLIC_SITE_URL ?? 'https://texthandled.com';
   }
 
+  /**
+   * The platform allowance gate. A customer can connect up to their tier's
+   * platform limit; reconnecting one they already have is always allowed.
+   * Throws a message written for the owner, because the connect controller puts
+   * the reason straight on the response.
+   */
+  private async assertWithinPlatformLimit(
+    customerId: string,
+    platform: Platform,
+  ): Promise<void> {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { planTier: true },
+    });
+    const connected = await this.prisma.connectedAccount.findMany({
+      where: { customerId, revoked: false },
+      select: { platform: true },
+    });
+    const tier = customer?.planTier ?? 'starter';
+    const already = connected.map((c) => c.platform);
+    if (!canConnectPlatform(tier, already, platform)) {
+      throw new Error(
+        `Your ${tier} plan covers ${platformLimit(tier)} connected platforms, and ` +
+          `you're already at that. Reply UPGRADE to add ${platformName(platform)}, ` +
+          `or disconnect one first.`,
+      );
+    }
+  }
+
   /** Step 1: hand the browser a link to go authorize a platform. */
   async startAuth(req: StartAuthRequest): Promise<StartAuthResult> {
+    // Enforce the tier's platform allowance before spending a round trip on an
+    // auth link the customer isn't entitled to use.
+    await this.assertWithinPlatformLimit(req.customerId, req.platform);
+
+    // Google Business Profile is a direct Google OAuth, not Post for Me. Its
+    // consent URL carries the customer id as `state`, and the owner returns to
+    // our own /connect/google/callback where the code is exchanged.
+    if (req.platform === 'google_business') {
+      if (!this.google.configured) {
+        this.log.warn('Connect offline mode (no GOOGLE_OAUTH_CLIENT_ID) — demo URL');
+        return {
+          url:
+            `${this.siteUrl}/connect/callback?customer=${encodeURIComponent(req.customerId)}` +
+            `&platform=google_business&demo=1`,
+          offline: true,
+        };
+      }
+      return { url: this.google.authUrl(req.customerId), offline: false };
+    }
+
     const redirectUrl =
       `${this.siteUrl}/connect/callback` +
       `?customer=${encodeURIComponent(req.customerId)}` +
@@ -116,6 +169,65 @@ export class ConnectService {
         },
       });
     }
+    return this.listConnected(customerId);
+  }
+
+  /**
+   * Google OAuth callback: the owner has authorized, and Google handed us a
+   * one-time code plus our customer id in `state`. Exchange it, resolve the
+   * business location, and store the connection.
+   *
+   * We persist the REFRESH token (encrypted), not an access token — Google's
+   * access tokens last an hour, and we mint a fresh one per publish from the
+   * refresh token. The location resource name rides in `postForMeRef` (a
+   * generic external-reference column); publishing needs it to know where the
+   * post goes. No token expiry is recorded: a refresh token does not lapse on a
+   * clock the way Meta's do, so there is nothing to nag the owner about.
+   */
+  async completeGoogle(code: string, customerId: string): Promise<ConnectedSummary[]> {
+    if (!this.google.configured) return this.listConnected(customerId);
+
+    const tokens = await this.google.exchangeCode(code);
+    if (!tokens.refreshToken) {
+      // Without a refresh token the connection dies in an hour. This happens
+      // when Google skips the consent screen on a re-auth — which is exactly
+      // what access_type=offline + prompt=consent exist to prevent, so treat it
+      // as a real failure rather than storing a doomed connection.
+      throw new Error(
+        'Google did not return a refresh token — reconnect and approve the consent screen.',
+      );
+    }
+
+    const location = await this.google.firstLocation(tokens.accessToken);
+    if (!location) {
+      throw new Error(
+        'No Business Profile location found on this Google account — is it the one that manages the shop?',
+      );
+    }
+
+    await this.prisma.connectedAccount.upsert({
+      where: { customerId_platform: { customerId, platform: 'google_business' } },
+      create: {
+        customerId,
+        platform: 'google_business',
+        // Required column: a marker, since the real secret is the refresh token.
+        accessTokenEnc: this.marker(),
+        refreshTokenEnc: this.crypto.encrypt(tokens.refreshToken),
+        // The post target `accounts/{account}/locations/{location}`, reused into the generic ref.
+        postForMeRef: location.name,
+        externalHandle: location.title ?? null,
+        scopes: [GoogleBusinessService.SCOPE],
+        revoked: false,
+        expiresAt: null,
+      },
+      update: {
+        refreshTokenEnc: this.crypto.encrypt(tokens.refreshToken),
+        postForMeRef: location.name,
+        externalHandle: location.title ?? null,
+        revoked: false,
+        reauthAskedAt: null,
+      },
+    });
     return this.listConnected(customerId);
   }
 

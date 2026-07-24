@@ -71,6 +71,10 @@ const FAQS = [
     a: 'A carousel is a swipeable set of slides — your tip or offer broken into a few clean, branded cards instead of a single photo. They are the most saved and most shared format on Instagram, which is why they are our headline feature. On Growth and Pro we build them from your posts automatically: every word spelled right, in your colors, ready before you have to think about it.',
   },
   {
+    q: 'Do you post to my Google Business Profile?',
+    a: 'Yes — and it is on every plan, starting with Starter. Your Google Business Profile is what people see when they search your name or find you on Maps, so a steady stream of fresh updates there does more for walk-in customers than almost anything else. We keep it posted alongside your other channels, automatically, from the same texts you already send us.',
+  },
+  {
     q: 'Do you need my passwords?',
     a: 'Never. You connect your accounts through a secure service that hands us permission to post and nothing else. Your login stays yours.',
   },

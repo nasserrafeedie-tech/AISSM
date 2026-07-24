@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 // product and lingered here.
 const PLATFORMS = [
   { id: 'instagram', name: 'Instagram', glyph: 'IG' },
+  { id: 'google_business', name: 'Google Business Profile', glyph: 'G' },
   { id: 'facebook', name: 'Facebook', glyph: 'f' },
   { id: 'tiktok', name: 'TikTok', glyph: '♪' },
   { id: 'threads', name: 'Threads', glyph: '@' },
@@ -23,10 +24,12 @@ interface Connected {
 }
 
 /**
- * Account connect surface. OAuth to each platform is brokered by Post for Me —
- * owners connect *their* accounts to *our* app (§2). Tapping a button asks the
- * backend for a hosted authorization link and sends the browser there. When we
- * come back, the callback page records what got connected.
+ * Account connect surface. OAuth to the social platforms is brokered by Post
+ * for Me; Google Business Profile is a direct Google OAuth (Post for Me has no
+ * Google support). Either way owners connect *their* accounts to *our* app
+ * (§2). Tapping a button asks the backend for an authorization link and sends
+ * the browser there. When we come back, the callback page records what got
+ * connected.
  *
  * The customer id normally arrives in the link we text during onboarding
  * (…/connect?c=<id>); without one we run in a friendly demo mode.
@@ -138,8 +141,8 @@ export default function ConnectPage() {
         )}
 
         <div className="rounded-2xl border border-ink/10 bg-parchment/60 px-6 py-4 font-mono text-[11px] leading-relaxed tracking-wide text-ink/55">
-          CONNECTIONS ARE BROKERED SECURELY BY POST FOR ME. WE NEVER SEE YOUR
-          PASSWORDS — TOKENS ARE ENCRYPTED AT REST.
+          CONNECTIONS ARE BROKERED SECURELY THROUGH EACH PLATFORM&rsquo;S OFFICIAL
+          SIGN-IN. WE NEVER SEE YOUR PASSWORDS — TOKENS ARE ENCRYPTED AT REST.
         </div>
       </div>
     </main>

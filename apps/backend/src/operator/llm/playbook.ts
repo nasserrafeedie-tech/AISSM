@@ -63,6 +63,11 @@ const PER_PLATFORM: Record<Platform, string[]> = {
     'Conversational and short, under 300 characters. Written to be replied to.',
     '0-2 hashtags.',
   ],
+  google_business: [
+    'This is a Google Business Profile update — it shows in Google Search and Maps, not a social feed. Write it for someone deciding whether to visit: what is new, what is on offer, a reason to come in. 100-250 words.',
+    'NO hashtags at all — Google ignores them and they read as spam in a search result. Lead with the plain search terms a local would type (what the business is, what it sells, the neighbourhood).',
+    'Prefer a clear next step in words ("call to book", "open until 8 tonight", "find us on Main St") over social-style engagement bait.',
+  ],
 };
 
 /**

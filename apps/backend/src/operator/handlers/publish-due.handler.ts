@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { type Task, type Result } from '@smm/contracts';
+import { type Task, type Result, type Platform } from '@smm/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PostForMeService } from '../publishing/post-for-me.service';
+import { GoogleBusinessService } from '../publishing/google-business.service';
+import { TokenCryptoService } from '../security/token-crypto.service';
 import {
   classifyPublishFailure,
   isRetryable,
@@ -23,7 +25,46 @@ export class PublishDueHandler implements TaskHandler<'PUBLISH_DUE'> {
   constructor(
     private readonly prisma: PrismaService,
     private readonly postForMe: PostForMeService,
+    private readonly google: GoogleBusinessService,
+    private readonly crypto: TokenCryptoService,
   ) {}
+
+  /**
+   * Publish through whichever backend a platform needs. Google Business Profile
+   * is a direct Google integration (Post for Me has no Google support): it posts
+   * a local post on the connected location, minting a fresh access token from
+   * the stored refresh token. Everything else goes through Post for Me. Both
+   * return the same shape, so the caller records the result identically.
+   */
+  private async publishTo(
+    account: { platform: string; postForMeRef: string | null; refreshTokenEnc: string | null },
+    post: { caption: string | null; hashtags: string[]; aiGeneratedMedia: boolean },
+    mediaUrls: string[],
+  ): Promise<{ externalPostId: string }> {
+    if (account.platform === 'google_business') {
+      if (!account.refreshTokenEnc || !account.postForMeRef) {
+        throw new Error('google_business connection is missing its token or location');
+      }
+      const caption = [post.caption ?? '', post.hashtags.map((h) => `#${h}`).join(' ')]
+        .filter(Boolean)
+        .join('\n\n');
+      return this.google.publish({
+        locationName: account.postForMeRef,
+        refreshToken: this.crypto.decrypt(account.refreshTokenEnc),
+        caption,
+        // A local post takes one photo, not a carousel — the first resolves.
+        mediaUrl: mediaUrls[0],
+      });
+    }
+    return this.postForMe.publish({
+      platform: account.platform as Platform,
+      postForMeRef: account.postForMeRef as string,
+      caption: post.caption ?? '',
+      hashtags: post.hashtags,
+      mediaUrls,
+      aiGenerated: post.aiGeneratedMedia,
+    });
+  }
 
   /**
    * mediaRefs store R2 keys ("owner/<customer>/<task>"), but the posting API
@@ -114,17 +155,11 @@ export class PublishDueHandler implements TaskHandler<'PUBLISH_DUE'> {
       }
 
       try {
-        const outcome = await this.postForMe.publish({
-          platform: post.platform,
-          postForMeRef: account.postForMeRef,
-          caption: post.caption ?? '',
-          hashtags: post.hashtags,
-          mediaUrls,
-          // Instagram and TikTok both require model-made imagery to be
-          // declared. Undisclosed AI content is a risk to the owner's account,
-          // not ours, so this travels with every publish.
-          aiGenerated: post.aiGeneratedMedia,
-        });
+        // Routed by platform: Google Business Profile posts directly to Google,
+        // everything else through Post for Me. AI-made imagery is declared on
+        // the Post for Me path (Instagram/TikTok require it); a Google local
+        // post has no such field.
+        const outcome = await this.publishTo(account, post, mediaUrls);
         await this.prisma.post.update({
           where: { id: post.id },
           data: { status: 'published', externalPostId: outcome.externalPostId },

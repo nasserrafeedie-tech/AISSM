@@ -47,6 +47,48 @@ export const FEATURE_LABEL: Record<Feature, string> = {
 
 const norm = (t: string): Tier => (t in RANK ? (t as Tier) : 'starter');
 
+/**
+ * How many platforms each tier may connect at once.
+ *
+ * There are five platforms (Instagram, Facebook, TikTok, Threads, Google
+ * Business Profile). Starter gets the essential pair a local shop needs to be
+ * found — Instagram + Google — while Growth reaches almost everywhere and Pro
+ * reaches all of them.
+ *
+ * This was previously only advertised on the pricing page and NOT enforced —
+ * any customer could connect all five. Adding Google Business Profile made that
+ * gap matter (it is the channel worth gating), so the allowance is now real,
+ * checked at connect time. Platform count is a secondary upgrade lever, not the
+ * hero of any tier jump (carousels sell Growth, reels sell Pro), which is why
+ * Starter can afford a generous two.
+ */
+const PLATFORM_LIMIT: Record<Tier, number> = {
+  starter: 2,
+  growth: 4,
+  pro: 5,
+};
+
+/** How many platforms this tier may connect. */
+export function platformLimit(planTier: string): number {
+  return PLATFORM_LIMIT[norm(planTier)];
+}
+
+/**
+ * Whether a customer may connect `platform`, given what they already have.
+ *
+ * Reconnecting a platform already on the list never counts against the limit —
+ * re-authing an expired Instagram token must not be refused because the account
+ * is "full". Only a genuinely new platform consumes a slot.
+ */
+export function canConnectPlatform(
+  planTier: string,
+  alreadyConnected: readonly string[],
+  platform: string,
+): boolean {
+  if (alreadyConnected.includes(platform)) return true;
+  return alreadyConnected.length < platformLimit(planTier);
+}
+
 /** Does this tier include this feature? */
 export function tierHas(planTier: string, f: Feature): boolean {
   return RANK[norm(planTier)] >= RANK[REQUIRES[f]];

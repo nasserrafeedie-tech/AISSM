@@ -6,6 +6,7 @@ import {
   Logger,
   Post,
   Query,
+  Redirect,
 } from '@nestjs/common';
 import { z } from 'zod';
 import { Platform } from '@smm/contracts';
@@ -53,6 +54,36 @@ export class ConnectController {
         // no customer data and no credentials pass through here.
         reason: reason.slice(0, 400),
       });
+    }
+  }
+
+  /**
+   * Google OAuth redirect target. Google sends the owner here with a one-time
+   * `code` and the customer id in `state`. We exchange it server-side, store the
+   * connection, and bounce the browser to the connect page — success or a
+   * readable error, never a raw stack. The redirect keeps the code out of the
+   * page and the owner out of an API response.
+   */
+  @Get('google/callback')
+  @Redirect()
+  async googleCallback(
+    @Query('code') code?: string,
+    @Query('state') state?: string,
+    @Query('error') error?: string,
+  ) {
+    const site = process.env.PUBLIC_SITE_URL ?? 'https://texthandled.com';
+    const base = `${site}/connect?customer=${encodeURIComponent(state ?? '')}`;
+    // The owner declined on Google's screen, or Google returned an error.
+    if (error || !code || !state) {
+      return { url: `${base}&google=denied` };
+    }
+    try {
+      await this.connect.completeGoogle(code, state);
+      return { url: `${base}&google=connected` };
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.log.error(`google callback for ${state} failed: ${reason}`);
+      return { url: `${base}&google=error` };
     }
   }
 

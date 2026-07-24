@@ -7,6 +7,7 @@ import { ModerationService } from './guardrails/moderation.service';
 import { PublishGateService } from './guardrails/publish-gate.service';
 import { TokenCryptoService } from './security/token-crypto.service';
 import { PostForMeService } from './publishing/post-for-me.service';
+import { GoogleBusinessService } from './publishing/google-business.service';
 import { PlaybookModule } from '../playbook/playbook.module';
 import { GraphicsService } from './graphics/graphics.service';
 import { ImageGenService } from './graphics/image-gen.service';
@@ -41,6 +42,7 @@ import { GenerateCarouselHandler } from './handlers/generate-carousel.handler';
     PublishGateService,
     TokenCryptoService,
     PostForMeService,
+    GoogleBusinessService,
     GraphicsService,
     ImageGenService,
     ImageSafetyService,
@@ -79,6 +81,7 @@ import { GenerateCarouselHandler } from './handlers/generate-carousel.handler';
     TokenCryptoService,
     GraphicsService,
     PostForMeService,
+    GoogleBusinessService,
     StorageService,
   ],
 })

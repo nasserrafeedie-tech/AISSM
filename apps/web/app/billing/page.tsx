@@ -22,7 +22,7 @@ const PLANS: {
     blurb: 'For a single location just getting consistent.',
     features: [
       '3 posts / week',
-      '1 platform',
+      'Instagram + your Google Business Profile',
       'Branded captions on your own photos',
       'You approve every post by text',
     ],
@@ -38,7 +38,7 @@ const PLANS: {
       'Swipeable branded carousels',
       'Custom generated images',
       '5 posts / week',
-      'Up to 3 platforms',
+      'Up to 4 platforms',
       'Routine posts go out hands-off',
       'Weekly performance tuning',
     ],

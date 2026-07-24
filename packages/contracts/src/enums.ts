@@ -15,12 +15,20 @@ import { z } from 'zod';
  * keep is one more set of limits, failure modes and token refreshes to get right.
  * TikTok stays — its Photo Mode takes 2–35 image carousels, so our flagship
  * format publishes there natively without any video.
+ *
+ * `google_business` is the odd one out: it is a Google Business Profile, not a
+ * feed, and for a local shop it is the single highest-value channel — it is what
+ * shows in Maps and Search. It does NOT go through Post for Me (which has no
+ * Google support); it is a direct Google integration with its own OAuth. Kept in
+ * the same enum because everything downstream — a post's target, the connected
+ * account, the tier's platform allowance — treats it as one more platform.
  */
 export const Platform = z.enum([
   'instagram',
   'facebook',
   'tiktok',
   'threads',
+  'google_business',
 ]);
 export type Platform = z.infer<typeof Platform>;
 

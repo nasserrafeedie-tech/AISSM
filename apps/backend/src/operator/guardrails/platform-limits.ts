@@ -57,6 +57,15 @@ export const PLATFORM_LIMITS: Record<Platform, PlatformLimits> = {
     maxMedia: 35,
     maxImageBytes: 20 * MB,
   },
+  google_business: {
+    // A Business Profile local post caps its summary at 1500 chars, takes a
+    // single photo (no carousel), and is lax on aspect — Google crops to its
+    // own frame. Photos over 5MB are commonly rejected, so cap there.
+    captionChars: 1500,
+    aspect: null,
+    maxMedia: 1,
+    maxImageBytes: 5 * MB,
+  },
 };
 
 export interface MediaFacts {

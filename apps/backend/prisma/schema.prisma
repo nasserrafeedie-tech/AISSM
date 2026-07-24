@@ -31,6 +31,7 @@ enum Platform {
   facebook
   tiktok
   threads
+  google_business
 }
 
 enum PostArchetype {

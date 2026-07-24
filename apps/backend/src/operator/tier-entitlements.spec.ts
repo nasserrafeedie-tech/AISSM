@@ -4,6 +4,8 @@ import {
   tierHas,
   entitlementLine,
   upgradePitch,
+  platformLimit,
+  canConnectPlatform,
 } from './tier-entitlements';
 import { tierHasCarousel } from './graphics/carousel-content';
 
@@ -32,6 +34,39 @@ describe('tier entitlements', () => {
   it('Growth and Pro include carousels', () => {
     assert.equal(tierHas('growth', 'carousel'), true);
     assert.equal(tierHas('pro', 'carousel'), true);
+  });
+
+  it('caps connected platforms at 2 / 4 / all by tier', () => {
+    assert.equal(platformLimit('starter'), 2);
+    assert.equal(platformLimit('growth'), 4);
+    assert.equal(platformLimit('pro'), 5);
+    // An unknown tier fails closed to the smallest allowance.
+    assert.equal(platformLimit('mystery'), 2);
+  });
+
+  describe('canConnectPlatform', () => {
+    it('lets a Starter customer connect their two, then blocks a third', () => {
+      assert.equal(canConnectPlatform('starter', [], 'instagram'), true);
+      assert.equal(canConnectPlatform('starter', ['instagram'], 'google_business'), true);
+      assert.equal(
+        canConnectPlatform('starter', ['instagram', 'google_business'], 'facebook'),
+        false,
+      );
+    });
+
+    it('always allows reconnecting a platform already on the list', () => {
+      // Re-authing an expired token must never be refused for being "full".
+      assert.equal(
+        canConnectPlatform('starter', ['instagram', 'google_business'], 'instagram'),
+        true,
+      );
+    });
+
+    it('gives Growth four and Pro all five', () => {
+      const four = ['instagram', 'facebook', 'tiktok', 'threads'];
+      assert.equal(canConnectPlatform('growth', four, 'google_business'), false);
+      assert.equal(canConnectPlatform('pro', four, 'google_business'), true);
+    });
   });
 
   it('reels and video are Pro-exclusive — Growth does not include them', () => {
