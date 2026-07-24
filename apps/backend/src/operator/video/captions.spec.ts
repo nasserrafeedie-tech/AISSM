@@ -165,3 +165,50 @@ describe('the ASS file', () => {
     assert.ok(!ass.includes('Dialogue:'), 'no speech must mean no caption events');
   });
 });
+
+describe('the hook, carried in the same file', () => {
+  const words = [{ text: 'hello', start: 0, end: 1 }];
+
+  it('emits a hook event over the opening 3 seconds', () => {
+    const ass = captionsToAss(words, { hookText: 'The secret nobody tells you' });
+    const hook = ass.split('\n').find((l) => l.startsWith('Dialogue:') && l.includes('Hook,'));
+    assert.ok(hook, 'no Hook dialogue line emitted');
+    assert.match(hook!, /Dialogue: 1,0:00:00\.00,0:00:03\.00,Hook,.*The secret nobody tells you/);
+  });
+
+  it('draws the hook on a higher layer than the captions', () => {
+    // A caption sharing the first 3 seconds must not stack on top of the hook;
+    // the hook is layer 1, captions layer 0, so the hook wins.
+    const dialogue = captionsToAss(words, { hookText: 'Watch this' })
+      .split('\n')
+      .filter((l) => l.startsWith('Dialogue:'));
+    const hook = dialogue.find((l) => l.includes(',Hook,'))!;
+    const cap = dialogue.find((l) => l.includes(',Cap,'))!;
+    assert.match(hook, /^Dialogue: 1,/);
+    assert.match(cap, /^Dialogue: 0,/);
+  });
+
+  it('gives the hook a boxed style filled with the brand accent', () => {
+    // BorderStyle 3 = opaque box; the OutlineColour field is the box fill and
+    // must carry the brand accent, not stay black.
+    const ass = captionsToAss(words, { accentHex: '#C9A227', hookText: 'Hi' });
+    const style = ass.split('\n').find((l) => l.startsWith('Style: Hook,'))!;
+    assert.ok(style.includes('&H0027A2C9'), 'hook box is not filled with the accent');
+    assert.match(style, /,3,18,0,8,/, 'hook is not an opaque top-centred box');
+  });
+
+  const hasHookEvent = (ass: string) =>
+    ass.split('\n').some((l) => l.startsWith('Dialogue:') && l.includes(',Hook,'));
+
+  it('adds no hook event when none is given', () => {
+    // The Hook style is always declared in the header; what must be absent is
+    // the Dialogue event that actually draws one.
+    assert.equal(hasHookEvent(captionsToAss(words, {})), false);
+  });
+
+  it('carries a hook even when there is no speech to caption', () => {
+    // Silent b-roll still gets its hook — the opening text is what earns
+    // distribution, independent of whether anyone is talking.
+    assert.equal(hasHookEvent(captionsToAss([], { hookText: 'Watch this' })), true);
+  });
+});

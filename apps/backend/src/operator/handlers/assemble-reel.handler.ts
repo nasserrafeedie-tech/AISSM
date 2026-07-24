@@ -140,6 +140,10 @@ export class AssembleReelHandler implements TaskHandler<'ASSEMBLE_REEL'> {
       {
         accentHex: toSvgColors(profile.brandColors ?? [])[1],
         brandStyle: theme.style,
+        // The hook rides in the same subtitle file as the captions — libass
+        // draws it, because the drawtext filter is absent from the ffmpeg build
+        // that runs in production.
+        hookText: edl.hook || defaultHook,
       },
     );
 
@@ -150,10 +154,7 @@ export class AssembleReelHandler implements TaskHandler<'ASSEMBLE_REEL'> {
         clipPaths: paths,
         edl,
         captionsAss,
-        hookText: edl.hook || defaultHook,
         endCardPng,
-        accentHex: toSvgColors(profile.brandColors ?? [])[1],
-        fontPath: font?.file,
         fontsDir: font?.dir,
       });
     } catch (err) {

@@ -35,7 +35,25 @@ export interface CaptionStyle {
   accentHex?: string;
   /** Type personality, mapped to the same faces the graphics engine uses. */
   brandStyle?: BrandStyle;
+  /**
+   * On-screen hook for the opening seconds, drawn as a boxed line near the top.
+   *
+   * The hook lives in the SAME ASS file as the captions rather than a separate
+   * drawtext pass, and that is not a style choice — the Linux ffmpeg-static
+   * binary that runs on Render is built without the drawtext filter, so a hook
+   * drawn that way fails the render outright ("No such filter: 'drawtext'").
+   * libass is present, so routing the hook through it is what makes the overlay
+   * work in production at all. It also retires the percent-sign/strftime
+   * escaping hazard that drawtext carried, since libass never runs the text
+   * through a format string.
+   */
+  hookText?: string;
 }
+
+/** How long the hook holds the screen — the window that earns distribution. */
+const HOOK_SECS = 3;
+/** The hook sits above the captions, near the top but clear of platform chrome. */
+const HOOK_MARGIN_V = 300;
 
 /** Words per caption line. The playbook calls for 2–4 at a time. */
 const MAX_WORDS_PER_LINE = 4;
@@ -175,6 +193,9 @@ export function groupWordsIntoLines(words: TranscriptWord[]): CaptionLine[] {
 export function buildAssFile(lines: CaptionLine[], style: CaptionStyle = {}): string {
   const font = captionFont(style.brandStyle);
   const accent = hexToAssColor(style.accentHex, '&H0000D7FF');
+  // The hook box fill. Falls back to a near-black box when no accent is given,
+  // so the hook is still legible rather than white-on-transparent.
+  const boxColor = hexToAssColor(style.accentHex, '&HDD000000');
 
   const header = [
     '[Script Info]',
@@ -194,6 +215,11 @@ export function buildAssFile(lines: CaptionLine[], style: CaptionStyle = {}): st
     // the caption block sits where the playbook wants it regardless of length.
     `Style: Cap,${font},96,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,` +
       `-1,0,0,0,100,100,0,0,1,6,3,8,80,80,${MARGIN_V},1`,
+    // Hook style: BorderStyle 3 draws an opaque box behind the text (the
+    // OutlineColour becomes the box fill), in the brand accent — the drawtext
+    // hook's boxed look, reproduced in libass. White text on the accent box.
+    `Style: Hook,${font},72,&H00FFFFFF,&H000000FF,${boxColor},&H00000000,` +
+      `-1,0,0,0,100,100,0,0,3,18,0,8,80,80,${HOOK_MARGIN_V},1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
@@ -213,10 +239,19 @@ export function buildAssFile(lines: CaptionLine[], style: CaptionStyle = {}): st
     return `Dialogue: 0,${assTime(line.start)},${assTime(line.end)},Cap,,0,0,0,,${painted}`;
   });
 
+  // The hook goes on its own layer so it draws over a caption that happens to
+  // share the opening seconds, rather than libass picking one arbitrarily.
+  const hook = style.hookText?.trim();
+  if (hook) {
+    events.unshift(
+      `Dialogue: 1,${assTime(0)},${assTime(HOOK_SECS)},Hook,,0,0,0,,${escapeAssText(hook)}`,
+    );
+  }
+
   return [...header, ...events, ''].join('\n');
 }
 
-/** Convenience: timed words straight to an ASS file. */
+/** Convenience: timed words (and an optional hook) straight to an ASS file. */
 export function captionsToAss(words: TranscriptWord[], style: CaptionStyle = {}): string {
   return buildAssFile(groupWordsIntoLines(words), style);
 }

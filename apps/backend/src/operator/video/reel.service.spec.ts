@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { ReelService } from './reel.service';
+import { captionsToAss } from './captions';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ffmpegPath: string = require('ffmpeg-static');
@@ -20,25 +21,32 @@ const run = promisify(execFile);
  * partial overlay — the reel just published without the one element that earns
  * it distribution. "It didn't throw" is not a passing bar for a renderer, so
  * these assert on the pixels.
+ *
+ * The hook is now a libass event, not a drawtext pass — the drawtext filter is
+ * absent from the ffmpeg build that runs in production, so it never rendered a
+ * hook there at all. These tests still assert on the pixels; they just build
+ * the hook through captionsToAss, the way the handler does.
  */
-const FONT = join(__dirname, '..', 'graphics', 'fonts', 'Anton-Regular.ttf');
+const FONTS_DIR = join(__dirname, '..', 'graphics', 'fonts');
 
 let work: string;
 let clip: string;
 const svc = new ReelService();
 
 /**
- * Crop the band where the hook sits and measure the encoded PNG size. A flat
+ * Crop the band where an overlay sits and measure the encoded PNG size. A flat
  * colour compresses to almost nothing; type in a filled box does not. That
- * difference is what tells us the overlay really made it onto the frame.
+ * difference is what tells us the overlay really made it onto the frame. The
+ * band defaults to the hook's position near the top.
  */
-async function hookBandBytes(mp4: Buffer, tag: string): Promise<number> {
+async function bandBytes(mp4: Buffer, tag: string, crop = 'crop=1080:340:0:270'): Promise<number> {
   const f = join(work, `${tag}.mp4`);
   writeFileSync(f, mp4);
   const png = join(work, `${tag}.png`);
-  await run(ffmpegPath, ['-y', '-i', f, '-frames:v', '1', '-vf', 'crop=1080:260:0:230', png]);
+  await run(ffmpegPath, ['-y', '-i', f, '-frames:v', '1', '-vf', crop, png]);
   return statSync(png).size;
 }
+const hookBandBytes = (mp4: Buffer, tag: string) => bandBytes(mp4, tag);
 
 before(async () => {
   work = mkdtempSync(join(tmpdir(), 'reel-spec-'));
@@ -86,6 +94,8 @@ describe('ReelService.assemble', () => {
 });
 
 describe('the hook overlay actually reaches the frame', () => {
+  const hookAss = (hook: string) =>
+    captionsToAss([], { accentHex: '#8A2E3B', brandStyle: 'bold', hookText: hook });
   let baseline = 0;
 
   it('establishes what an empty hook band looks like', async () => {
@@ -94,6 +104,9 @@ describe('the hook overlay actually reaches the frame', () => {
   });
 
   // Every one of these is copy an owner or the drafter could plausibly write.
+  // The percent sign is the original regression; libass never runs the text
+  // through a format string, so it can no longer erase the overlay — but it is
+  // kept as a guard against a future engine that does.
   for (const [name, hook] of [
     ['plain text', 'Fresh pastries daily'],
     ['a percent sign', '50% off this Friday'], // the regression
@@ -104,7 +117,7 @@ describe('the hook overlay actually reaches the frame', () => {
   ] as [string, string][]) {
     it(`draws the hook when it contains ${name}`, async () => {
       const out = await svc.assemble({
-        clipPaths: [clip], hookText: hook, fontPath: FONT, accentHex: '#8A2E3B',
+        clipPaths: [clip], captionsAss: hookAss(hook), fontsDir: FONTS_DIR,
       });
       const bytes = await hookBandBytes(out, name.replace(/\W/g, '_'));
       assert.ok(
@@ -114,11 +127,11 @@ describe('the hook overlay actually reaches the frame', () => {
     });
   }
 
-  it('still produces a reel when no font is available to draw with', async () => {
-    const out = await svc.assemble({
-      clipPaths: [clip], hookText: 'No font here', fontPath: join(work, 'missing.ttf'),
-    });
-    assert.ok(out.length > 0, 'a missing font should cost the hook, not the reel');
+  it('produces a reel even when libass cannot resolve the font dir', async () => {
+    // A missing fonts dir must cost styling, not the reel — libass falls back
+    // to a default face rather than failing the render.
+    const out = await svc.assemble({ clipPaths: [clip], captionsAss: hookAss('No fonts here') });
+    assert.ok(out.length > 0, 'a missing font dir should not sink the render');
   });
 });
 
@@ -128,7 +141,6 @@ describe('the hook overlay actually reaches the frame', () => {
  * viewer sees anything, so these assert on the frame the same way the hook
  * tests do: crop the caption band and measure how much the PNG compresses.
  */
-const FONTS_DIR = join(__dirname, '..', 'graphics', 'fonts');
 
 async function captionBandBytes(mp4: Buffer, tag: string): Promise<number> {
   const f = join(work, `${tag}.mp4`);
@@ -182,17 +194,17 @@ describe('captions reach the frame', () => {
     );
   });
 
-  it('renders captions and the hook together in one pass', async () => {
-    // Both overlays share a single filter chain; a mistake there silently drops
-    // one of them, and the reel ships looking half-finished.
-    const out = await svc.assemble({
-      clipPaths: [clip],
-      captionsAss: ass,
-      fontsDir: FONTS_DIR,
-      hookText: 'Save 20% [today only]',
-      fontPath: FONT,
-      accentHex: '#8A2E3B',
-    });
+  it('renders captions and the hook together from one ASS file', async () => {
+    // Both overlays live in the same subtitle file; if the hook event and the
+    // caption events collide libass drops one, and the reel ships half-finished.
+    const both = captionsToAss(
+      [
+        { text: 'consistency', start: 0.3, end: 1.1 },
+        { text: 'wins', start: 1.1, end: 1.8 },
+      ],
+      { accentHex: '#8A2E3B', brandStyle: 'bold', hookText: 'Save 20% [today only]' },
+    );
+    const out = await svc.assemble({ clipPaths: [clip], captionsAss: both, fontsDir: FONTS_DIR });
     assert.ok(await captionBandBytes(out, 'both-cap') > baseline * 1.5, 'captions missing');
     assert.ok(await hookBandBytes(out, 'both-hook') > 8000, 'hook missing');
   });

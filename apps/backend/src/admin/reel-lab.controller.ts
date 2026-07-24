@@ -100,7 +100,11 @@ export class ReelLabController {
       // ---- stage 4: captions on the finished timeline ----------------------
       const timeline = mapWordsToTimeline(decision, transcripts.map((t) => t.words));
       const lines = groupWordsIntoLines(timeline);
-      const ass = captionsToAss(timeline, { accentHex: '#C9A227', brandStyle: 'bold' });
+      const ass = captionsToAss(timeline, {
+        accentHex: '#C9A227',
+        brandStyle: 'bold',
+        hookText: decision.hook,
+      });
 
       // ---- stage 5: render -------------------------------------------------
       const rStart = Date.now();
@@ -108,8 +112,6 @@ export class ReelLabController {
         clipPaths: clips,
         edl: decision,
         captionsAss: ass,
-        hookText: decision.hook,
-        fontPath: join(__dirname, '..', 'operator', 'graphics', 'fonts', 'Poppins-Bold.ttf'),
         fontsDir: join(__dirname, '..', 'operator', 'graphics', 'fonts'),
       });
       const renderMs = Date.now() - rStart;

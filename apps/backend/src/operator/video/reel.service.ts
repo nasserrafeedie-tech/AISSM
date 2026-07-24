@@ -60,12 +60,8 @@ export class ReelService {
      * Instagram will never see.
      */
     captionsAss?: string;
-    hookText?: string;
     /** 1080×1080 brand card PNG from the graphics engine; padded to 9:16. */
     endCardPng?: Buffer;
-    /** Brand accent for the hook text box, e.g. "#C9A227". */
-    accentHex?: string;
-    fontPath?: string;
     /** Directory of bundled TTFs, so libass can resolve the caption font. */
     fontsDir?: string;
   }): Promise<Buffer> {
@@ -157,52 +153,28 @@ export class ReelService {
       const joined = join(work, 'joined.mp4');
       await this.ffmpeg(['-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', joined]);
 
-      // 4. Overlays: captions throughout, then the hook over the opening. Both
-      //    go in ONE filter chain — running them as separate passes would
-      //    re-encode the video twice and visibly soften it for no benefit.
-      const filters: string[] = [];
-
+      // 4. Overlays: captions and the hook, both burned in from ONE ASS file
+      //    through libass.
+      //
+      //    The hook used to be a separate drawtext pass. That filter is absent
+      //    from the Linux ffmpeg-static build Render runs — the render failed
+      //    with "No such filter: 'drawtext'", so it never worked in production
+      //    at all. libass IS present, and the caption path already proved it,
+      //    so the hook is now an event in the same subtitle file (see
+      //    captions.ts). One pass, one text engine, and no drawtext dependency.
+      const final = join(work, 'final.mp4');
       if (opts.captionsAss?.trim()) {
-        // The ASS file carries every caption, so caption text never enters the
-        // filtergraph — the same reasoning as the hook's textfile below, and
-        // the reason a transcript full of quotes and percent signs is safe.
+        // The ASS file carries every overlay, so no overlay text ever enters
+        // the filtergraph — which is why a transcript or a hook full of quotes
+        // and percent signs is safe without any escaping.
         const assFile = join(work, 'captions.ass');
         writeFileSync(assFile, opts.captionsAss, 'utf8');
-        filters.push(
+        const subtitles =
           `subtitles=filename='${esc(assFile)}'` +
-            (opts.fontsDir && existsSync(opts.fontsDir)
-              ? `:fontsdir='${esc(opts.fontsDir)}'`
-              : ''),
-        );
-      }
-
-      if (opts.hookText && opts.fontPath && existsSync(opts.fontPath)) {
-        // The hook is read from a FILE, not interpolated into the filtergraph,
-        // and expansion is switched off. Both matter:
-        //
-        //  • `expansion=none` stops drawtext running strftime over the text. A
-        //    hook like "50% off this Friday" was silently rendering as NOTHING
-        //    — the whole overlay vanished, no error, and the reel published
-        //    without the one element that earns it distribution. Percent signs
-        //    are unavoidable in promo copy, so this is not an edge case.
-        //  • `textfile=` keeps quotes, colons and commas out of the filter
-        //    string entirely, so no amount of escaping cleverness is needed for
-        //    copy a language model wrote.
-        const textFile = join(work, 'hook.txt');
-        writeFileSync(textFile, opts.hookText, 'utf8');
-        const box = opts.accentHex ? `${opts.accentHex}@0.85` : 'black@0.55';
-        filters.push(
-          `drawtext=fontfile='${esc(opts.fontPath)}':textfile='${esc(textFile)}'` +
-            `:expansion=none:fontsize=64:fontcolor=white:box=1:boxcolor=${box}` +
-            `:boxborderw=28:x=(w-text_w)/2:y=h*0.16:enable='lte(t,3)'`,
-        );
-      }
-
-      const final = join(work, 'final.mp4');
-      if (filters.length > 0) {
+          (opts.fontsDir && existsSync(opts.fontsDir) ? `:fontsdir='${esc(opts.fontsDir)}'` : '');
         await this.ffmpeg([
           '-i', joined,
-          '-vf', filters.join(','),
+          '-vf', subtitles,
           ...X264_LOW_MEMORY,
           '-c:a', 'copy',
           final,
