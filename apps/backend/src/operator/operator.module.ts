@@ -70,6 +70,11 @@ import { GenerateCarouselHandler } from './handlers/generate-carousel.handler';
   ],
   exports: [
     CustomerContextService,
+    // Exported for the admin reel diagnostics endpoint, which runs the video
+    // pipeline stage by stage so a bad edit can be inspected rather than guessed at.
+    ReelService,
+    TranscriptionService,
+    EdlService,
     OPERATOR_REGISTRY,
     TokenCryptoService,
     GraphicsService,
