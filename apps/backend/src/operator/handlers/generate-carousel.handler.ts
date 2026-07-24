@@ -95,7 +95,7 @@ export class GenerateCarouselHandler implements TaskHandler<'GENERATE_CAROUSEL'>
     const [customer, profile, post] = await Promise.all([
       this.prisma.customer.findUnique({
         where: { id: task.customer_id },
-        select: { businessName: true, planTier: true, aiImagesOptIn: true },
+        select: { businessName: true, planTier: true, aiImagesOptIn: true, trustLevel: true },
       }),
       this.prisma.brandProfile.findUnique({ where: { customerId: task.customer_id } }),
       this.prisma.post.findUnique({ where: { id: task.payload.post_id } }),
@@ -248,8 +248,20 @@ export class GenerateCarouselHandler implements TaskHandler<'GENERATE_CAROUSEL'>
       where: { id: post.id },
       data: {
         mediaRefs: refs,
+        // A generated hero is always DISCLOSED (aiGeneratedMedia). It is also
+        // forced back to the owner's REVIEW — except on full_auto, where the
+        // owner has made two explicit choices: opt into generated imagery, and
+        // publish without per-post review. Requiring approval anyway would
+        // contradict both. The hard SAFETY floor is untouched: the vision place-
+        // check already rejected a fabricated place before we got here, at every
+        // trust level. So full_auto waives review, not safety.
         ...(usedAiImage
-          ? { aiGeneratedMedia: true, approvalState: 'awaiting_owner' as const }
+          ? {
+              aiGeneratedMedia: true,
+              ...(customer.trustLevel === 'full_auto'
+                ? {}
+                : { approvalState: 'awaiting_owner' as const }),
+            }
           : {}),
       },
     });

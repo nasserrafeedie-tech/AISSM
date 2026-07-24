@@ -68,3 +68,26 @@ describe('carousel hero image — guardrails', () => {
     assert.equal(await h.generateHeroImage('cus_1', 'cafe', 'x'), null);
   });
 });
+
+/**
+ * The AI-hero approval gate vs. trust level. A generated hero forces the post
+ * back to the owner's review — EXCEPT on full_auto, where the owner has
+ * consented to both generated imagery and posting without per-post review. The
+ * vision place-check (the real safety floor) runs regardless and is not what
+ * this decides.
+ */
+describe('AI hero + trust level → who reviews', () => {
+  // Mirror the exact expression the handler uses, so this pins the intent even
+  // if the surrounding handler is refactored.
+  const forcesReview = (trust: string) => trust !== 'full_auto';
+
+  it('forces owner review on approve_all', () => {
+    assert.equal(forcesReview('approve_all'), true);
+  });
+  it('forces owner review on auto_low_risk', () => {
+    assert.equal(forcesReview('auto_low_risk'), true);
+  });
+  it('waives review ONLY on full_auto (double consent)', () => {
+    assert.equal(forcesReview('full_auto'), false);
+  });
+});

@@ -41,6 +41,10 @@ const UpsertCustomerBody = z.object({
   // Consent to generated photography. Off by default (the owner's decision); set
   // here to turn a customer's carousel covers into generated hero images.
   aiImagesOptIn: z.boolean().optional(),
+  // How much runs without the owner: approve_all (every post confirmed),
+  // auto_low_risk (low-risk auto, high-risk confirmed), full_auto (low-risk auto
+  // including generated imagery; high-risk still always confirmed by the gate).
+  trustLevel: z.enum(['approve_all', 'auto_low_risk', 'full_auto']).optional(),
 });
 
 const MakeCarouselBody = z.object({
