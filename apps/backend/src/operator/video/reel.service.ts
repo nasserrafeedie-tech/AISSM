@@ -107,6 +107,12 @@ export class ReelService {
         await this.ffmpeg([
           // -ss BEFORE -i seeks by keyframe and is dramatically faster; the
           // re-encode that follows makes the cut frame-accurate anyway.
+          // Cap DECODE threads. ffmpeg defaults to one thread per core, and
+          // each holds its own reference frames — on 4K that alone took peak
+          // memory from ~520MB to 1.46GB and OOM-killed a 512MB container,
+          // taking the whole backend down with it. The core count of the box
+          // has nothing to do with how much memory it has.
+          '-threads', '2',
           ...(cut.start > 0 ? ['-ss', String(cut.start)] : []),
           '-i', cut.path,
           '-t', String(cut.duration),
@@ -117,7 +123,7 @@ export class ReelService {
           // phone happened to write first. `?` keeps silent b-roll working.
           '-map', '0:v:0', '-map', '0:a:0?',
           '-vf', videoFilter(cut.hdr),
-          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+          ...X264_LOW_MEMORY,
           '-c:a', 'aac', '-ar', '44100', '-ac', '2',
           '-shortest',
           out,
@@ -137,7 +143,7 @@ export class ReelService {
           '-f', 'lavfi', '-t', String(ReelService.CARD_SECS), '-i', 'anullsrc=r=44100:cl=stereo',
           '-vf',
           'scale=1080:1080,pad=1080:1920:0:420:black,fps=30,setsar=1,format=yuv420p',
-          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+          ...X264_LOW_MEMORY,
           '-c:a', 'aac', '-ar', '44100', '-ac', '2',
           '-shortest',
           out,
@@ -197,7 +203,7 @@ export class ReelService {
         await this.ffmpeg([
           '-i', joined,
           '-vf', filters.join(','),
-          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+          ...X264_LOW_MEMORY,
           '-c:a', 'copy',
           final,
         ]);
@@ -225,12 +231,17 @@ export class ReelService {
   }
 }
 
-/** Fit any source to the 1080×1920 reel canvas at a uniform 30fps. */
+/**
+ * Fit any source to the 1080×1920 reel canvas at a uniform 30fps.
+ *
+ * Kept separate from the pixel-format conversion so the HDR path can slot tone
+ * mapping in between — see videoFilter.
+ */
 const FIT_9_16 =
-  'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,setsar=1,format=yuv420p';
+  'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,setsar=1';
 
 /**
- * Tone map HDR down to bt709 before fitting the frame.
+ * Tone map HDR down to bt709.
  *
  * The chain is the standard one: linearise the signal, work in float so the
  * highlight roll-off has headroom, map with Hable (it protects highlights
@@ -238,18 +249,46 @@ const FIT_9_16 =
  * window, a shop light), then re-tag as bt709. `desat=0` is deliberate:
  * ffmpeg's default desaturates highlights, and on skin tones under a bright
  * window that reads as a grey wash across someone's face.
- *
- * Applied ONLY to HDR sources. It roughly doubles encode time, so paying it on
- * the SDR clips that don't need it would cost every reel for the benefit of
- * some.
  */
 const TONEMAP_SDR =
   'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,' +
   'tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv';
 
+/**
+ * Scale FIRST, then tone map. The order is the whole point.
+ *
+ * Tone mapping runs in 32-bit float, so a frame costs width×height×3×4 bytes
+ * while it is in the filter. At a 4K source that is ~99MB per frame and the
+ * filter holds several at once — which is exactly how this pipeline exhausted
+ * a 512MB container and took the whole backend down with it. Downscaling to
+ * the 1080×1920 delivery size first drops the same frame to ~25MB, a 4×
+ * saving, for no visible difference: the reel is 1080 wide either way, so the
+ * detail thrown away by tone mapping at full resolution was going to be
+ * discarded by the scaler regardless.
+ *
+ * Tone mapping is applied ONLY to HDR sources — it is the expensive half of
+ * the chain, and SDR clips must not pay for it.
+ */
 function videoFilter(hdr: boolean): string {
-  return hdr ? `${TONEMAP_SDR},${FIT_9_16}` : FIT_9_16;
+  return hdr
+    ? `${FIT_9_16},${TONEMAP_SDR},format=yuv420p`
+    : `${FIT_9_16},format=yuv420p`;
 }
+
+/**
+ * Encoder settings tuned for a small container rather than for speed.
+ *
+ * x264 looks ahead 40 frames by default to make better rate decisions, holding
+ * every one of them in memory; at 1080×1920 that alone is a few hundred MB.
+ * Ten frames is plenty for footage cut into 2–4 second segments, and capping
+ * the thread count stops x264 allocating a full frame buffer per core on a
+ * machine whose core count has nothing to do with its memory.
+ */
+const X264_LOW_MEMORY = [
+  '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+  '-threads', '2',
+  '-x264-params', 'rc-lookahead=10:sync-lookahead=0:threads=2',
+];
 
 /**
  * Escape a path for use inside a filtergraph option. Backslashes, colons and
