@@ -48,16 +48,36 @@ export class PublishGateService {
   /**
    * Classify draft risk. Presence of a price, percentage, date, or promo
    * language pushes a post to `high` (§8). Deliberately conservative — false
-   * positives just mean an extra owner confirmation.
+   * positives just mean an extra owner confirmation, and under full_auto this
+   * classifier IS the line between "auto-posts on its own" and "a human sees it
+   * first", so it errs toward catching.
+   *
+   * The gaps that were letting real promos auto-post: non-dollar currencies
+   * (£5, €3), worded discounts ("20 percent off", "half off"), and multi-buy
+   * offers ("two for one", "buy one get one"). Each is money the owner would
+   * want to sign off on. Widened to catch them — but "save" is only a signal in
+   * a money context ("save $5", "save big"), never bare, so the playbook's own
+   * "save this post" call-to-action still auto-publishes as the evergreen
+   * content it is.
    */
   classifyRisk(caption: string): RiskLevel {
     const c = caption.toLowerCase();
     const signals = [
-      /\$\s?\d/, // prices
-      /\b\d{1,3}\s?%/, // percentages / discounts
-      /\b(sale|deal|offer|discount|promo|coupon|free|bogo|limited time)\b/,
-      /\b(today|tomorrow|tonight|this (week|weekend)|ends|expires)\b/,
-      /\b(guarantee|guaranteed|best|#1|cheapest|lowest price)\b/, // claims
+      // Prices, any common currency symbol or worded amount.
+      /[$£€]\s?\d/,
+      /\b\d+\s?(dollars?|bucks?|cents?|quid|euros?|pounds?)\b/,
+      // Percentages and worded discounts.
+      /\b\d{1,3}\s?(%|percent)/,
+      /\b(half|\d{1,3}\s?(%|percent))\s?(off|price)\b/,
+      // Promo / offer language.
+      /\b(sale|deal|offer|discount|promo|coupon|free|bogo|limited time|special|clearance|markdown)\b/,
+      /\b(buy one|two for one|2 for 1|half off|half price)\b/,
+      /\bsave\s+(\$?\d|up to|big)\b/,
+      // Time pressure and specific calendar dates.
+      /\b(today|tomorrow|tonight|this (week|weekend)|ends|expires|grand opening)\b/,
+      /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s?\d{1,2}\b/,
+      // Superlative / comparative claims.
+      /\b(guarantee|guaranteed|best|#1|cheapest|lowest price)\b/,
     ];
     return signals.some((re) => re.test(c)) ? 'high' : 'low';
   }
