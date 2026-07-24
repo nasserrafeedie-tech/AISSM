@@ -77,7 +77,11 @@ export default function StartPage() {
             unchecked-by-default consent checkbox, the TCPA consent language, and
             Privacy/Terms links — the whole opt-in the reviewer must verify. */}
         <div className="rounded-2xl bg-ink p-6">
-          <LeadForm source="start-optin" />
+          <LeadForm
+            source="start-optin"
+            cta="Sign up for Handled"
+            doneText="You're signed up ✳ Your first text will confirm your details and get you started."
+          />
         </div>
       </section>
     </main>
