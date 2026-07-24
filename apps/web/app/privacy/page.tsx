@@ -85,8 +85,8 @@ export default function PrivacyPage() {
         <h2 className="font-display text-xl font-medium">Contact</h2>
         <p className="text-ink/75">
           Questions about this policy? Contact us at{' '}
-          <a className="underline" href="mailto:support@aissm.app">
-            support@aissm.app
+          <a className="underline" href="mailto:support@texthandled.com">
+            support@texthandled.com
           </a>
           .
         </p>
