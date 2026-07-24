@@ -165,6 +165,33 @@ describe('remapping captions onto the finished timeline', () => {
     assert.equal(words.length, 0);
   });
 
+  it('tags each word with its segment so captions never cross a cut', () => {
+    // The real-footage bug: a caption line merged the tail of a beach clip with
+    // the head of an intro clip ("got pretty What's up") because grouping ran
+    // by time alone across the seam. The segment tag is what lets the caption
+    // grouper break at the cut.
+    const words = mapWordsToTimeline(
+      {
+        segments: [
+          { clip_index: 0, start: 0, end: 2 },
+          { clip_index: 1, start: 0, end: 2 },
+        ],
+        hook: 'x',
+      },
+      [
+        [{ text: 'beach', start: 1.8, end: 1.95 }],
+        [{ text: 'intro', start: 0.1, end: 0.3 }],
+      ],
+    );
+    // The two words land microseconds apart on the timeline but carry different
+    // segment tags, which is exactly what stops them sharing a line.
+    const beach = words.find((w) => w.text === 'beach')!;
+    const intro = words.find((w) => w.text === 'intro')!;
+    assert.equal(beach.segment, 0);
+    assert.equal(intro.segment, 1);
+    assert.ok(intro.start - beach.end < 0.3, 'the words really are adjacent on the timeline');
+  });
+
   it('handles a clip with no transcript beside one that has speech', () => {
     // Silent b-roll intercut with talking is the normal case, not an edge one.
     const words = mapWordsToTimeline(

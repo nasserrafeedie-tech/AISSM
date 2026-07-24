@@ -108,6 +108,20 @@ describe('grouping words into caption lines', () => {
   it('returns nothing for silent footage rather than an empty caption', () => {
     assert.deepEqual(groupWordsIntoLines([]), []);
   });
+
+  it('never groups words from two different segments onto one line', () => {
+    // The garbled-caption bug from real footage: adjacent-in-time words that
+    // belong to different clips must break, not merge.
+    const lines = groupWordsIntoLines([
+      { text: 'got', start: 3.6, end: 3.8, segment: 0 },
+      { text: 'pretty', start: 3.8, end: 4.0, segment: 0 },
+      { text: "What's", start: 4.0, end: 4.2, segment: 1 },
+      { text: 'up', start: 4.2, end: 4.4, segment: 1 },
+    ]);
+    assert.equal(lines.length, 2, 'the cut must split these into two lines');
+    assert.equal(lines[0].text, 'got pretty');
+    assert.equal(lines[1].text, "What's up");
+  });
 });
 
 describe('the ASS file', () => {

@@ -119,7 +119,7 @@ export function mapWordsToTimeline(
   const out: TranscriptWord[] = [];
   let offset = 0;
 
-  for (const seg of edl.segments) {
+  edl.segments.forEach((seg, segmentIndex) => {
     const words = transcripts[seg.clip_index] ?? [];
     for (const w of words) {
       // Require the whole word inside the slice. A word half-cut by the trim
@@ -130,11 +130,14 @@ export function mapWordsToTimeline(
           text: w.text,
           start: offset + (w.start - seg.start),
           end: offset + (w.end - seg.start),
+          // Tag the source segment so caption grouping breaks at every cut —
+          // words from two clips must never land on one line (see captions.ts).
+          segment: segmentIndex,
         });
       }
     }
     offset += seg.end - seg.start;
-  }
+  });
 
   return out.sort((a, b) => a.start - b.start);
 }

@@ -28,6 +28,16 @@ export interface TranscriptWord {
   text: string;
   start: number;
   end: number;
+  /**
+   * Which edit segment this word belongs to, once mapped onto the reel
+   * timeline. Words from different segments must never share a caption line:
+   * at a cut the tail of one clip and the head of the next sit microseconds
+   * apart on the timeline, so grouping by time alone staples them together
+   * into nonsense — a real reel showed "got pretty What's up", the end of a
+   * beach clip glued to the start of an intro. Left undefined on a raw
+   * per-clip transcript, where there is only one segment and no seam to cross.
+   */
+  segment?: number;
 }
 
 export interface CaptionStyle {
@@ -168,6 +178,9 @@ export function groupWordsIntoLines(words: TranscriptWord[]): CaptionLine[] {
   };
 
   for (const w of usable) {
+    // A cut is a hard line break: never group a word with one from a different
+    // edit segment, or the caption reads as two clips' speech mashed together.
+    if (buf.length > 0 && w.segment !== buf[buf.length - 1].segment) flush();
     buf.push(w);
     const spans = w.end - buf[0].start;
     const endsSentence = /[.!?]$/.test(w.text.trim());
