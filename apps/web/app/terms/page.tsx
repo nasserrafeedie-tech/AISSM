@@ -135,8 +135,8 @@ export default function TermsPage() {
         <h2 className="font-display text-xl font-medium">Contact</h2>
         <p className="text-ink/75">
           Questions? Contact us at{' '}
-          <a className="underline" href="mailto:support@texthandled.com">
-            support@texthandled.com
+          <a className="underline" href="mailto:nasser@texthandled.com">
+            nasser@texthandled.com
           </a>
           .
         </p>
